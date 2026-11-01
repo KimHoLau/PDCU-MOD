@@ -87,6 +87,9 @@ PDCU 宾得相机DNG文件补齐四季色彩矩阵及曲线参数工具(春红HA
 这是为了兼容既有发布、快捷方式和脚本；Windows 文件属性里的
 `FileDescription` / `ProductName` 仍为 **PDCU MOD**，不随文件名变化。
 
+macOS 上要用 py2app 打包（`python3 setup.py py2app`），打包步骤与
+「预览卡在正在加载预览…」的排查见 `docs/PDCU-macOS-py2app打包.md`。
+
 ## 版本
 > 发布物命名沿用旧名 `PDCU-Season-Params`（exe / zip / InternalName /
 > OriginalFilename），产品名与文件属性中的 FileDescription / ProductName
