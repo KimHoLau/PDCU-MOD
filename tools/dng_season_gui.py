@@ -10,9 +10,12 @@ from __future__ import annotations
 
 __copyright__ = "Copyright © 2026 KimHoLau X deepseek harness"
 
+import base64
+import faulthandler
 import io
 import os
 import queue
+import subprocess
 import sys
 import threading
 import time
@@ -57,6 +60,97 @@ ON_ACCENT = "#07131f"
 SELECT_BG = "#17283b"
 SELECT_BORDER = "#2c557f"
 LOG_BG = "#121212"
+
+# ---- diagnostics ---------------------------------------------------------
+# A packaged build (py2app / PyInstaller) has no console, so a failure in the
+# preview path used to vanish silently and leave the pane at "正在加载预览…"
+# forever.  Log to a file, and never let the preview wait without a deadline.
+PREVIEW_TIMEOUT = 8.0        # seconds before the preview pane gives up
+PREVIEW_INTERVAL_MS = 80     # how often the pane drains the worker queue
+PREVIEW_PANE_WIDTH = 290     # requested width of the preview column
+PREVIEW_PANE_MIN_WIDTH = 150 # the pane yields room before the list does
+LIST_MIN_WIDTH = 320         # the file list never shrinks below this
+PREVIEW_MAX_SOURCE = 2048    # keep the decoded frame at or below this edge
+
+_LOGGING = {
+    "enabled": (bool(getattr(sys, "frozen", False))
+                or sys.platform == "darwin"
+                or bool(os.environ.get("PDCU_DEBUG"))),
+    "stream": None,
+}
+
+
+def borderless_window() -> bool:
+    """Self-drawn borderless frame on Windows; a normal window on macOS.
+
+    An override-redirect window cannot become key on Aqua: after a redraw the
+    hit-testing region goes stale and whole bands of the dialog stop receiving
+    clicks.  Either mode can be forced for A/B testing on one build:
+
+        PDCU_TITLED_WINDOW=1      ... use the normal titled window
+        PDCU_BORDERLESS_WINDOW=1  ... use the borderless one
+    """
+    if os.environ.get("PDCU_TITLED_WINDOW"):
+        return False
+    if os.environ.get("PDCU_BORDERLESS_WINDOW"):
+        return True
+    return sys.platform != "darwin"
+
+
+def log_path() -> str:
+    """Where the running build records tracebacks."""
+    if sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Logs")
+    elif sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    else:
+        base = os.path.expanduser("~/.local/state")
+    return os.path.join(base, "PDCU MOD", "pdcu-mod.log")
+
+
+def log_line(message: str) -> None:
+    """Append one timestamped line to the log; never raise."""
+    if not _LOGGING["enabled"]:
+        return
+    try:
+        if _LOGGING["stream"] is None:
+            path = log_path()
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            _LOGGING["stream"] = open(path, "a", encoding="utf-8",
+                                      buffering=1)
+        _LOGGING["stream"].write(
+            "[%s] %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), message))
+    except Exception:
+        _LOGGING["enabled"] = False
+
+
+def install_crash_logging() -> None:
+    """Record uncaught exceptions, thread crashes and hard aborts."""
+    if not _LOGGING["enabled"]:
+        return
+    log_line("--- start %s v%s on %s (python %s, tk %s, pillow %s)"
+             % (APP_TITLE, APP_VERSION, sys.platform,
+                sys.version.split()[0], tk.TkVersion,
+                getattr(Image, "__version__", "missing")))
+
+    def main_hook(exc_type, exc, tb):
+        log_line("uncaught:\n"
+                 + "".join(traceback.format_exception(exc_type, exc, tb)))
+
+    sys.excepthook = main_hook
+    try:
+        threading.excepthook = lambda args: log_line(
+            "thread crash:\n" + "".join(traceback.format_exception(
+                args.exc_type, args.exc_value, args.exc_traceback)))
+    except Exception:
+        pass
+    try:
+        if _LOGGING["stream"] is not None:
+            # A beachball leaves a Python-level stack in the log.
+            faulthandler.enable(file=_LOGGING["stream"], all_threads=True)
+    except Exception:
+        pass
+
 
 SEASONS = (
     ("春红", "HARUBENI", "#e2648c", "spring.png"),
@@ -251,11 +345,28 @@ class HoverTip:
 
     def _show(self):
         self._show_job = None
-        if self._tip is not None or not self._owner.winfo_exists():
+        if self._tip is not None:
             return
+        try:
+            if not self._owner.winfo_exists():
+                return
+            self._build_tip()
+        except Exception:
+            # Runs from an `after` callback: in a packaged .app the traceback
+            # would go nowhere and the tip would silently never appear.
+            log_line("tooltip failed:\n" + traceback.format_exc())
+            self._hide()
+
+    def _build_tip(self):
         window = tk.Toplevel(self._owner)
         window.withdraw()
-        window.overrideredirect(True)
+        # Borderless is what we want, but Aqua may refuse the decoration and
+        # then draw the tip behind the main window.  Treat both as best effort:
+        # the tip still has to show up.
+        try:
+            window.overrideredirect(True)
+        except tk.TclError:
+            log_line("tooltip: override-redirect refused, using a normal window")
         window.configure(bg=BORDER)
         frame = tk.Frame(window, bg=PANEL)
         frame.pack(padx=1, pady=1)
@@ -270,6 +381,12 @@ class HoverTip:
         y = min(max(4, y), window.winfo_screenheight() - height - 4)
         window.geometry("+%d+%d" % (x, y))
         window.deiconify()
+        try:
+            # Without this the tip can end up under the main window on macOS.
+            window.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+        window.lift()
         self._tip = window
 
     def _hide(self):
@@ -533,8 +650,14 @@ class FileChooserDialog(tk.Toplevel):
                  initial=None):
         super().__init__(parent, bg=BG)
         self.withdraw()
-        self.overrideredirect(True)
-        self.configure(highlightthickness=1, highlightbackground="#3a3a3a")
+        # A borderless (override-redirect) window cannot become key on macOS
+        # Aqua: clicks on the native listbox stop landing and repaints come out
+        # clipped.  Keep the self-drawn frame on Windows; on macOS use a normal
+        # window, which behaves.
+        self._borderless = borderless_window()
+        if self._borderless:
+            self.overrideredirect(True)
+            self.configure(highlightthickness=1, highlightbackground="#3a3a3a")
         self.result = None
         self._mode = mode
         self._multiple = bool(multiple and mode == "files")
@@ -544,8 +667,12 @@ class FileChooserDialog(tk.Toplevel):
         self._preview_queue = queue.Queue()
         self._preview_seq = 0
         self._preview_photo = None
+        self._preview_image = None
+        self._preview_text = "选择 DNG 查看预览"
         self._preview_busy = False
         self._preview_pending = None
+        self._preview_timer = None
+        self._preview_resize_job = None
 
         head = tk.Frame(self, bg=PANEL)
         head.pack(fill="x")
@@ -595,7 +722,9 @@ class FileChooserDialog(tk.Toplevel):
         content = tk.Frame(body, bg=BG)
         content.pack(fill="both", expand=True)
         content.rowconfigure(0, weight=1)
-        content.columnconfigure(0, weight=1)
+        # The list is the primary control: it keeps a floor, and the preview
+        # pane gives up room first (it fits its bitmap to whatever it gets).
+        content.columnconfigure(0, weight=1, minsize=LIST_MIN_WIDTH)
         list_wrap = tk.Frame(content, bg=BG)
         list_wrap.grid(row=0, column=0, sticky="nsew")
         list_wrap.rowconfigure(0, weight=1)
@@ -617,18 +746,26 @@ class FileChooserDialog(tk.Toplevel):
         self.listbox.bind("<Return>", self._on_double)
         self.listbox.bind("<<ListboxSelect>>", self._on_select)
 
-        preview = tk.Frame(content, bg=PANEL, width=276,
+        preview = tk.Frame(content, bg=PANEL, width=PREVIEW_PANE_WIDTH,
                            highlightthickness=1, highlightbackground=BORDER)
-        preview.grid(row=0, column=1, sticky="ns", padx=(10, 0))
-        preview.grid_propagate(False)
-        self.preview_label = tk.Label(
-            preview, text="选择 DNG 查看预览", bg=PANEL, fg=TEXT_MUTE,
-            font=(FONT, 9), justify="center")
-        self.preview_label.pack(fill="both", expand=True, padx=8, pady=8)
+        preview.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        # Pin the pane width.  Left to the children alone the grid squeezes this
+        # column, and a widget smaller than the bitmap shows only its left
+        # corner -- the "只出左侧一点点" symptom.
+        content.columnconfigure(1, minsize=PREVIEW_PANE_MIN_WIDTH)
+        # A Canvas has no intrinsic size, so the image can be fitted to whatever
+        # space the pane actually got without feeding a resize loop.
+        self.preview_canvas = tk.Canvas(preview, bg=PANEL, highlightthickness=0,
+                                        bd=0, width=248, height=190)
+        self.preview_canvas.pack(fill="both", expand=True, padx=8, pady=8)
         self.preview_info = tk.Label(
             preview, text="", bg=PANEL, fg=TEXT_MUTE, font=(FONT, 8),
-            anchor="w", justify="left")
+            anchor="w", justify="left", height=2)
         self.preview_info.pack(fill="x", padx=8, pady=(0, 8))
+        # A stuck or failed preview must be recoverable without reopening the
+        # dialog; the pane itself is the retry button.
+        self.preview_canvas.bind("<Button-1>", self._retry_preview)
+        self.preview_canvas.bind("<Configure>", self._preview_resized)
 
         self.error = tk.Label(body, text="", bg=BG, fg="#e05a5a",
                               font=(FONT, 8), anchor="w")
@@ -664,7 +801,8 @@ class FileChooserDialog(tk.Toplevel):
         self.deiconify()
         self.lift()
         self.focus_force()
-        self.grab_set()
+        if self._borderless:
+            self.grab_set()      # on macOS modality comes from transient + wait_window
         self.after(20, self.path_entry.focus_set)
         self.after(80, self._poll_preview)
 
@@ -707,6 +845,10 @@ class FileChooserDialog(tk.Toplevel):
         try:
             return list(os.listdrives())
         except AttributeError:
+            if sys.platform != "win32":
+                # macOS / Linux have no drive letters.
+                return [path for path in ("/", os.path.expanduser("~"))
+                        if os.path.isdir(path)]
             return [drive for drive in
                     ("%s:\\" % chr(code) for code in range(ord("C"), ord("Z") + 1))
                     if os.path.isdir(drive)]
@@ -832,11 +974,11 @@ class FileChooserDialog(tk.Toplevel):
         self._queue_preview()
 
     def _clear_preview(self, text="选择 DNG 查看预览"):
+        self._cancel_preview_timer()
         self._preview_seq += 1
         self._preview_pending = None
-        self._preview_photo = None
-        self.preview_label.configure(image="", text=text)
-        self.preview_info.configure(text="")
+        self._preview_busy = False
+        self._show_message(text)
 
     def _queue_preview(self):
         selected = self.listbox.curselection()
@@ -854,11 +996,106 @@ class FileChooserDialog(tk.Toplevel):
             return
         self._preview_seq += 1
         seq = self._preview_seq
-        self._preview_photo = None
-        self.preview_label.configure(image="", text="正在加载预览…")
+        self._show_message("正在加载预览…")
         self.preview_info.configure(text=os.path.basename(path))
         self._preview_pending = (seq, path)
+        self._arm_preview_timer()
         self._start_preview()
+
+    def _show_message(self, text):
+        """Show placeholder text in the pane instead of a bitmap."""
+        self._preview_image = None
+        self._preview_text = text
+        self.preview_info.configure(text="")
+        self._draw_preview_pane()
+
+    def _draw_preview_pane(self):
+        """Draw the pane at its current size: bitmap fitted, or the message.
+
+        The image is scaled to whatever space the pane actually has, so a
+        narrow pane (small window, macOS layout) can never clip it to a corner.
+        """
+        canvas = self.preview_canvas
+        try:
+            width = canvas.winfo_width()
+            height = canvas.winfo_height()
+        except (tk.TclError, AttributeError):
+            return
+        if width <= 1 or height <= 1:      # not laid out yet; <Configure> retries
+            return
+        canvas.delete("all")
+        if self._preview_image is None:
+            canvas.create_text(width // 2, height // 2, text=self._preview_text,
+                               fill=TEXT_MUTE, font=(FONT, 9),
+                               width=max(80, width - 24), justify="center")
+            return
+        fitted = self._preview_image.copy()
+        fitted.thumbnail((max(32, width - 4), max(32, height - 4)), Image.LANCZOS)
+        photo = self._photo_for(fitted)
+        self._preview_photo = photo
+        canvas.create_image(width // 2, height // 2, image=photo,
+                            anchor="center")
+
+    def _preview_resized(self, _event=None):
+        """Debounced redraw: the pane changed size, re-fit the bitmap."""
+        if self._preview_resize_job is not None:
+            try:
+                self.after_cancel(self._preview_resize_job)
+            except tk.TclError:
+                pass
+            self._preview_resize_job = None
+        try:
+            self._preview_resize_job = self.after(120, self._redraw_preview)
+        except tk.TclError:
+            self._preview_resize_job = None
+
+    def _redraw_preview(self):
+        self._preview_resize_job = None
+        try:
+            if not self.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        self._draw_preview_pane()
+
+    def _retry_preview(self, _event=None):
+        """Click on the preview pane: start over if nothing is in flight."""
+        if self._preview_busy:
+            return
+        self._queue_preview()
+
+    def _arm_preview_timer(self) -> None:
+        self._cancel_preview_timer()
+        try:
+            self._preview_timer = self.after(
+                int(PREVIEW_TIMEOUT * 1000), self._preview_timed_out)
+        except tk.TclError:
+            self._preview_timer = None
+
+    def _cancel_preview_timer(self) -> None:
+        if self._preview_timer is None:
+            return
+        try:
+            self.after_cancel(self._preview_timer)
+        except tk.TclError:
+            pass
+        self._preview_timer = None
+
+    def _preview_timed_out(self) -> None:
+        self._preview_timer = None
+        if not self._preview_busy and self._preview_pending is None:
+            return
+        pending = self._preview_pending
+        path = pending[1] if pending else getattr(self, "_current", "")
+        log_line("preview timed out after %.0fs: %r"
+                 % (PREVIEW_TIMEOUT, path))
+        self._preview_busy = False
+        self._preview_pending = None
+        self._preview_seq += 1          # drop a result that arrives too late
+        if self._preview_image is None:
+            self._show_message("预览超时，点此重试")
+            self.preview_info.configure(
+                text="%.0f 秒内没有取到预览图" % PREVIEW_TIMEOUT)
 
     def _start_preview(self):
         if self._preview_busy or self._preview_pending is None:
@@ -879,41 +1116,108 @@ class FileChooserDialog(tk.Toplevel):
                 image = Image.open(path)
             image.load()
             original_w, original_h = image.size
-            image.thumbnail((248, 190), Image.LANCZOS)
+            # Keep the frame large enough to stay sharp on a resize; the pane
+            # does the final fit on the Tk thread.
+            if max(image.size) > PREVIEW_MAX_SOURCE:
+                image.thumbnail((PREVIEW_MAX_SOURCE, PREVIEW_MAX_SOURCE),
+                                Image.LANCZOS)
             if image.mode not in ("RGB", "RGBA"):
                 image = image.convert("RGB")
             self._preview_queue.put(
                 (seq, image, dng.model, original_w, original_h, ""))
         except Exception as exc:
+            log_line("preview worker failed for %r:\n%s"
+                     % (path, traceback.format_exc()))
             self._preview_queue.put((seq, None, "", 0, 0, str(exc)))
 
     def _poll_preview(self):
-        if not self.winfo_exists():
+        try:
+            if not self.winfo_exists():
+                return
+        except tk.TclError:
             return
         try:
-            while True:
+            self._drain_previews()
+            if self._preview_pending is not None:
+                self._start_preview()
+        except Exception:
+            # One broken hand-off must not kill the 80 ms pump: that is the
+            # exact way the pane used to freeze at "正在加载预览…".
+            self._preview_failed(traceback.format_exc())
+        try:
+            self.after(PREVIEW_INTERVAL_MS, self._poll_preview)
+        except tk.TclError:
+            pass
+
+    def _drain_previews(self) -> None:
+        while True:
+            try:
                 seq, image, model, width, height, error = (
                     self._preview_queue.get_nowait())
-                self._preview_busy = False
-                if seq != self._preview_seq:
-                    continue
-                if image is not None:
-                    self._preview_photo = ImageTk.PhotoImage(image)
-                    self.preview_label.configure(image=self._preview_photo,
-                                                 text="")
-                    self.preview_info.configure(
-                        text="%s\n%d × %d"
-                        % (model or os.path.basename(self._current), width, height))
-                else:
-                    self._preview_photo = None
-                    self.preview_label.configure(image="",
-                                                 text="无法读取预览")
-                    self.preview_info.configure(text=error[:120])
-        except queue.Empty:
+            except queue.Empty:
+                return
+            self._preview_busy = False
+            if seq != self._preview_seq:
+                continue
+            self._cancel_preview_timer()
+            if image is None:
+                self._show_message("无法读取预览")
+                self.preview_info.configure(text=(error or "")[:120])
+                continue
+            self._preview_image = image
+            self._preview_text = ""
+            self.preview_info.configure(
+                text="%s\n%d × %d"
+                % (model or os.path.basename(self._current), width, height))
+            self._draw_preview_pane()
+
+    def _photo_for(self, image):
+        """Build a Tk photo, falling back to a Pillow-free bridge if needed."""
+        if ImageTk is not None:
+            try:
+                return ImageTk.PhotoImage(image)
+            except Exception:
+                log_line("ImageTk.PhotoImage failed, using PNG fallback:\n"
+                         + traceback.format_exc())
+        return self._tk_photo(image)
+
+    @staticmethod
+    def _tk_photo(image):
+        """Build a Tk photo without Pillow's Tk bridge.
+
+        Pillow encodes the pixels, Tk decodes them: no Pillow/Tk ABI involved,
+        which is what breaks first inside a frozen .app.
+        """
+        rgb = image.convert("RGB")
+        try:
+            buffer = io.BytesIO()
+            rgb.save(buffer, "PNG")
+            data = base64.b64encode(buffer.getvalue()).decode("ascii")
+            return tk.PhotoImage(data=data, format="png")
+        except Exception:
+            # Tk 8.5 has no PNG reader: push pixels row by row instead.
+            width, height = rgb.size
+            pixels = rgb.load()
+            rows = []
+            for y in range(height):
+                rows.append("{" + " ".join(
+                    "#%02x%02x%02x" % pixels[x, y] for x in range(width))
+                    + "}")
+            photo = tk.PhotoImage(width=width, height=height)
+            photo.put(" ".join(rows))
+            return photo
+
+    def _preview_failed(self, detail: str) -> None:
+        log_line("preview pane failed:\n" + detail)
+        self._preview_busy = False
+        self._preview_pending = None      # a failure must not restart by itself
+        self._cancel_preview_timer()
+        last = [line for line in detail.strip().splitlines() if line.strip()]
+        try:
+            self._show_message("预览出错，点此重试")
+            self.preview_info.configure(text=(last[-1] if last else "")[:120])
+        except tk.TclError:
             pass
-        if self._preview_pending is not None:
-            self._start_preview()
-        self.after(80, self._poll_preview)
 
     def _accept(self):
         if self._mode == "dir":
@@ -1739,7 +2043,12 @@ class App(tk.Tk):
 
     def _open_out_dir(self) -> None:
         if self.last_out_dir and os.path.isdir(self.last_out_dir):
-            os.startfile(self.last_out_dir)
+            if sys.platform == "win32":
+                os.startfile(self.last_out_dir)
+            else:
+                subprocess.Popen(
+                    ["open" if sys.platform == "darwin" else "xdg-open",
+                     self.last_out_dir])
         else:
             show_alert(self, "提示", "还没有输出目录。", "info")
 
@@ -1775,9 +2084,66 @@ def selftest(argv) -> int:
         return 1
 
 
+def preview_selftest(path: str) -> int:
+    """Diagnose the preview path from a terminal: --preview-selftest FILE.
+
+    Run it through the packaged binary
+    (`PDCU MOD.app/Contents/MacOS/PDCU MOD --preview-selftest x.DNG`) and the
+    report names the step that fails inside the bundle.
+    """
+    lines = ["python %s" % sys.version.split()[0],
+             "platform %s" % sys.platform,
+             "frozen %s" % bool(getattr(sys, "frozen", False)),
+             "tk %s" % tk.TkVersion,
+             "pillow %s" % getattr(Image, "__version__", "missing"),
+             "file %s" % path]
+    ok = False
+    try:
+        if Image is None:
+            raise RuntimeError("Pillow is not importable in this build")
+        dng = core.Dng(path)
+        raw = dng.preview_jpeg()
+        lines.append("model %r" % (dng.model,))
+        lines.append("preview bytes %d" % len(raw or b""))
+        image = Image.open(io.BytesIO(raw)) if raw else Image.open(path)
+        image.load()
+        lines.append("decoded %dx%d %s"
+                     % (image.size[0], image.size[1], image.mode))
+        image.thumbnail((248, 190), Image.LANCZOS)
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            if ImageTk is not None:
+                try:
+                    photo = ImageTk.PhotoImage(image)
+                    lines.append("imagetk ok %dx%d"
+                                 % (photo.width(), photo.height()))
+                except Exception:
+                    lines.append("imagetk FAILED:\n" + traceback.format_exc())
+            photo = FileChooserDialog._tk_photo(image)
+            lines.append("png photo ok %dx%d"
+                         % (photo.width(), photo.height()))
+            ok = True
+        finally:
+            root.destroy()
+    except Exception:
+        lines.append(traceback.format_exc())
+    report = "\n".join(lines)
+    print(report)
+    log_line("preview selftest %s:\n%s" % (path, report))
+    return 0 if ok else 1
+
+
 def main() -> int:
+    if "--preview-selftest" in sys.argv:
+        rest = [arg for arg in sys.argv[1:] if arg != "--preview-selftest"]
+        if not rest:
+            print("usage: --preview-selftest <file.DNG>")
+            return 2
+        return preview_selftest(rest[0])
     if any(flag in sys.argv for flag in core.SELFTEST_FLAGS):
         return selftest(sys.argv)
+    install_crash_logging()
     app = App()
     app.mainloop()
     return 0

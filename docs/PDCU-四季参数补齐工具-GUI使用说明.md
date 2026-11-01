@@ -72,6 +72,9 @@ K-3 / K-5 / 645Z / KP / K-S2 使用 KF 数据并按机身自动适配。
 python -m PyInstaller --noconfirm --clean PDCU-Season-Params.spec
 ```
 
+macOS（含 10.13）用 py2app 打包的命令、预览卡在「正在加载预览…」时的排查
+步骤，见 `docs/PDCU-macOS-py2app打包.md`。
+
 ---
 
 版权所有 © 2026 KimHoLau X deepseek harness
