@@ -35,7 +35,7 @@ except Exception:  # Pillow is optional in a source checkout.
 import dng_season_params as core
 
 APP_TITLE = "PDCU MOD"
-APP_VERSION = "2.9"
+APP_VERSION = "2.10"
 APP_INTRO = ("PDCU 宾得相机DNG文件补齐四季色彩矩阵及曲线参数工具"
              "(春红HARUBENI、夏至KATEN、九秋KYUSHU、冬日FUYUNO)")
 COPYRIGHT = "版权所有 © 2026 KimHoLau X deepseek harness"
@@ -1276,8 +1276,8 @@ class App(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("%s v%s" % (APP_TITLE, APP_VERSION))
-        self.geometry("1200x974")
-        self.minsize(1120, 944)
+        self.geometry("1200x1008")
+        self.minsize(1120, 978)
         self.configure(bg=BG)
 
         self.targets: list[str] = []
