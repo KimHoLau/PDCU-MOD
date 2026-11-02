@@ -155,3 +155,64 @@ sample "PDCU MOD" 5 -file /tmp/pdcu-sample.txt
   做 ad-hoc 签名，可减少 Gatekeeper 与 TCC 的反复提示。
 - 本工具不写 raw 像素，macOS 侧只影响「文件选择器预览」这一处；转换结果与
   Windows 版逐字节一致（见 readme 的自检哈希）。
+
+## 8. 在 Apple Silicon（M 系列）上无法运行
+
+在 10.13 的 Intel 机器上打的包，拿到 M 系列笔记本上双击很可能什么都不发生。
+两条独立原因，都很常见：
+
+1. **架构**：10.13 上的 Python 是 x86_64，py2app 打出来的所有 Mach-O 都是
+   x86_64。M 系列需要 Rosetta 2 才能跑；没装（或装不上）就是直接不启动。
+2. **签名**：Apple Silicon 要求所有可执行代码至少有 ad-hoc 签名，从别处拷来的
+   未签名二进制会被系统直接终止（`Killed: 9`），日志里常见的
+   `code signature invalid` 就是这个。
+
+先跑一条诊断命令，它会逐个子二进制打印架构、签名状态，并给出下一步：
+
+```bash
+python3 tools/check_macos_bundle.py "dist/PDCU MOD.app"
+```
+
+输出形如：
+
+```
+host     arm64  macOS 14.5  Rosetta 未安装
+signed   否
+archs  binary
+x86_64 Contents/MacOS/PDCU MOD
+x86_64 Contents/Frameworks/Python.framework/Versions/3.9/Python
+[block] 这个 .app 只有 x86_64，本机是 Apple Silicon 且未装 Rosetta 2 ...
+[block] Apple Silicon 要求所有可执行代码至少 ad-hoc 签名 ...
+结论：启动不了，按上面的命令修
+```
+
+三条路，按推荐顺序：
+
+1. **在 Apple Silicon 机器上重新打包**（最稳）。装 arm64 版 Python 3.9+ 与
+   Pillow，`python3 setup.py py2app`，产出的就是 arm64；打包后照样跑一次上面的
+   诊断命令确认 `archs` 是 arm64。
+2. **让 Intel 包在 M 系列上跑**：先
+   `softwareupdate --install-rosetta --agree-to-license`，再
+   `codesign --deep --force --sign - "dist/PDCU MOD.app"`。能跑，但慢且有后续
+   兼容风险。
+3. **一份 universal2 包**：需要 Python、Tcl/Tk、Pillow 全是 universal2，
+   `PDCU_ARCH=universal2 python3 setup.py py2app`，最后仍以诊断命令打印的
+   `lipo` 结果为准——任何一环不是 universal2，产出就还是单架构。
+
+签名与分发：
+
+```bash
+codesign --deep --force --sign - "dist/PDCU MOD.app"      # ad-hoc，仅本机/小范围
+codesign --deep --force --sign "Developer ID Application: ..." "dist/PDCU MOD.app"
+```
+
+要发给别人还得 `notarytool` 公证，本仓库没有自动化这一步。另外，从网上下载的
+包会带 quarantine 属性，首次打开被拦时用「系统设置 → 隐私与安全性 → 仍要打开」，
+或 `xattr -dr com.apple.quarantine "dist/PDCU MOD.app"`。
+
+如果诊断命令说「能启动」却仍然打不开，那就是启动期崩溃（不是架构/签名）：
+
+```bash
+"dist/PDCU MOD.app/Contents/MacOS/PDCU MOD"     # 终端里直接跑，看 stderr
+ls -t ~/Library/Logs/DiagnosticReports/ | head  # 找 PDCU MOD 开头的 .ips
+```

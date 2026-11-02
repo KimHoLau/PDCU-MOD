@@ -197,6 +197,28 @@ def plan_report(target, plan, missing, names, warning):
         for tag, (rel, raw) in sorted(plan["relocated"].items()):
             lines.append("relocate       : tag 0x%04X -> private +0x%X (%d B)"
                          % (tag, rel, len(raw)))
+    elif plan.get("kind") == "rebuild_makernote":
+        lines.append("mode table     : %d -> %d B (%+d), nRecords %d -> %d"
+                     % (target.table_len, len(plan["new_table"]),
+                        plan["table_growth"], target.n_records, plan["nrec"]))
+        if plan.get("layout_upgraded"):
+            lines.append("record layout  : %d params / %d B -> %d params / "
+                         "%d B (PDCU needs the 12-parameter layout for the "
+                         "four seasons)"
+                         % (target.n_params, target.rec_size,
+                            plan["n_params"], plan["rec_size"]))
+        lines.append("maker note     : rebuild at 0x%X (old 0x%X, %d -> %d B, "
+                     "%+d); block is packed, so the whole block moves"
+                     % (plan["new_block_off"], plan["old_block_off"],
+                        plan["old_block_len"], plan["new_block_len"],
+                        plan["block_growth"]))
+        lines.append("tag data       : 0x021A at 0x%X, 0x021B at 0x%X"
+                     % (plan["new_table_off"], plan["new_blocks_off"]))
+        lines.append("matrix table   : %d -> %d B, matrices %d -> %d"
+                     % (target.blocks_len, plan["new_blocks_len"],
+                        target.block_count, plan["new_block_count"]))
+        lines.append("file growth    : +%d B (append only; raw, preview and "
+                     "thumbnail offsets unchanged)" % plan["file_growth"])
     else:
         lines.append("mode table     : %d -> %d B (%+d), nRecords %d -> %d"
                      % (target.table_len, len(plan["new_table"]),

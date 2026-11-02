@@ -73,6 +73,7 @@ from __future__ import annotations
 __copyright__ = "Copyright © 2026 KimHoLau X deepseek harness"
 
 import argparse
+import hashlib
 import os
 import shutil
 import struct
@@ -84,6 +85,7 @@ import season_645d_data
 import season_k01_data
 import season_k1_data
 import season_k1ii_data
+import season_k20d_data
 import season_k30_data
 import season_k50_data
 import season_kf_data
@@ -122,6 +124,7 @@ MODEL_TO_DONOR_KIND = {
     "PENTAX KP": "kf",
     "PENTAX K-S2": "kf",
     "PENTAX 645D": "645d",
+    "PENTAX K20D": "k20d",
     "PENTAX K-30": "k30",
     "PENTAX K-01": "k01",
     "PENTAX K-50": "k50",
@@ -164,6 +167,9 @@ BUILTIN_SOURCES = {
     "builtin_645d": BuiltinSource(
         "builtin_645d", "内置 645D", ("645d",),
         "季节来源：内置 645D 四季参数"),
+    "builtin_k20d": BuiltinSource(
+        "builtin_k20d", "内置 K20D", ("k20d",),
+        "季节来源：内置 K20D 四季参数"),
 }
 BUILTIN_SOURCE_MODELS = {
     source.key: frozenset(
@@ -182,6 +188,7 @@ AUTO_SELECT_GROUPS = (
     ("builtin_k30", frozenset(("PENTAX K-30", "PENTAX K-01", "PENTAX K-50",
                                "PENTAX Q7", "PENTAX MX-1"))),
     ("builtin_645d", frozenset(("PENTAX 645D",))),
+    ("builtin_k20d", frozenset(("PENTAX K20D",))),
     ("builtin_kf", frozenset(("PENTAX K-3", "PENTAX K-3 II", "PENTAX K-5 II",
                               "PENTAX K-5 II s", "PENTAX 645Z", "PENTAX KP",
                               "PENTAX K-S2"))),
@@ -199,6 +206,7 @@ SELFTEST_DONOR_FLAGS = {
     "--selftest-k50": "k50",
     "--selftest-q7": "q7",
     "--selftest-mx1": "mx1",
+    "--selftest-k20d": "k20d",
 }
 SELFTEST_FLAGS = tuple(SELFTEST_DONOR_FLAGS) + ("--selftest-cross",)
 
@@ -821,13 +829,62 @@ class Dng:
         return dng_report.describe_dng(self, SEASON_NAMES)
 
     def preview_jpeg(self):
-        """Embedded Pentax private-block JPEG preview, or None."""
+        """Embedded JPEG preview: private block first, then a SubIFD strip."""
+        raw = self._private_preview_jpeg()
+        if raw is None:
+            raw = self._subifd_preview_jpeg()
+        return raw
+
+    def _private_preview_jpeg(self):
+        """Pentax private-block JPEG preview (0x0003/0x0004 pair), or None."""
         try:
             ranges = self._precise_preview_ranges()
         except Exception:
             return None
         for start, end, _label in ranges:
             raw = bytes(self.data[start:end])
+            if raw.startswith(b"\xff\xd8") and raw.rstrip().endswith(b"\xff\xd9"):
+                return raw
+        return None
+
+    def _subifd_preview_jpeg(self):
+        """A complete JPEG strip in IFD0's SubIFDs, or None.
+
+        The K20D writes no 0x0003/0x0004 preview pair into its AOC block; its
+        DNG preview is a normal SubIFD strip (4672x3104).  Only plain JPEG
+        strips are considered: tile tables (0x0144) and CFA/raw data never
+        match, which keeps this from picking up the raw image.
+        """
+        sub = self.ifd0.get(0x014A)
+        if sub is None or sub["size"] < 4:
+            return None
+        try:
+            offsets = [_u32(self.data, sub["value_off"] + 4 * i, self.endian)
+                       for i in range(sub["count"])]
+        except DngError:
+            return None
+        for offset in offsets:
+            try:
+                entries = parse_ifd(self.data, offset, self.endian)
+            except DngError:
+                continue
+            comp = entries.get(0x0103)
+            photo = entries.get(0x0106)
+            strips = entries.get(0x0111)
+            lengths = entries.get(0x0117)
+            if (comp is None or strips is None or lengths is None
+                    or strips["count"] != 1 or lengths["count"] != 1):
+                continue
+            if _u16(self.data, comp["value_off"], self.endian) != 7:
+                continue
+            if (photo is not None and
+                    _u16(self.data, photo["value_off"], self.endian) == 32803):
+                continue
+            start = _u32(self.data, strips["value_off"], self.endian)
+            length = _u32(self.data, lengths["value_off"], self.endian)
+            if length < 4 or start + length > len(self.data):
+                continue
+            raw = bytes(self.data[start:start + length])
             if raw.startswith(b"\xff\xd8") and raw.rstrip().endswith(b"\xff\xd9"):
                 return raw
         return None
@@ -1128,6 +1185,7 @@ _BUILTIN_DATA_MODULES = {
     "k50": season_k50_data,
     "q7": season_q7_data,
     "mx1": season_mx1_data,
+    "k20d": season_k20d_data,
 }
 BUILTIN_DONOR_KINDS = tuple(_BUILTIN_DATA_MODULES)
 
@@ -1164,15 +1222,19 @@ def _param_ids(holder):
 
 
 def project_record(raw, src_params, src_endian, dst_params, dst_endian,
-                   fill=0xFFFF):
+                   fill=None):
     """Re-encode one 0x021A record for another parameter list.
 
-    The 645D writes 11 parameter slots (1-9, 128, 129) where the newer bodies
-    write 12 (1-10, 128, 129).  PDCU only recognises the four seasons in the
-    12-slot layout, so a 645D table is rebuilt with the extra slot filled by
-    'fill' (0xFFFF, the "unset" value these tables use).  Selecting by
-    parameter id keeps every other slot in place instead of shifting it; the
-    mode id and the matrix index (param 128) keep their meaning.
+    Older bodies write fewer parameter slots (645D: 11, K20D: 8) than the
+    12 (1-10, 128, 129) PDCU needs for the four seasons, so a record is rebuilt
+    with the missing slots filled by their layout defaults: parameter 10 is the
+    "unset" slot (0xFFFF), while 7-9 are neutral 0 -- that is exactly what the
+    KF records themselves carry (0, 0, 0, 0xFFFF).  Filling 7-9 with 0xFFFF
+    instead makes PDCU develop K20D files with lifted shadows and a flat look
+    (measured: mean 57.3/46.7/37.6 instead of the camera preview's 60.6/50.7/
+    42.7).  Selecting by parameter id keeps every other slot in place instead
+    of shifting it; the mode id and the matrix index (param 128) keep their
+    meaning.
     """
     words = struct.unpack(src_endian + "%dH" % (len(raw) // 2), bytes(raw))
     if len(words) != len(src_params) + 1:
@@ -1182,7 +1244,12 @@ def project_record(raw, src_params, src_endian, dst_params, dst_endian,
     by_id = dict(zip(src_params, words[1:]))
     out = [words[0]]
     for pid in dst_params:
-        out.append(by_id[pid] if pid in by_id else fill)
+        if pid in by_id:
+            out.append(by_id[pid])
+        elif fill is not None:
+            out.append(fill)
+        else:
+            out.append(0xFFFF if pid == 10 else 0)
     return struct.pack(dst_endian + "%dH" % len(out), *out)
 
 
@@ -1318,6 +1385,125 @@ def build_new_table(target, donor, missing, xform=None):
     }
     return header + b"".join(r["bytes"] for r in new_records), nrec, added, info
 
+def _preview_offsets(dng):
+    """The 0x0004/0x0005 preview offsets, which are tag *data* (absolute)."""
+    values = {}
+    for tag in (0x0004, 0x0005):
+        entry = dng.priv_entries.get(tag)
+        if entry is not None and entry["size"] == 4:
+            values[tag] = _u32(dng.data, entry["value_off"], dng.priv_endian)
+    return values
+
+
+def _private_tag_digest(dng):
+    """Fingerprint the private tags a maker-note move must not alter."""
+    digest = {}
+    for tag, entry in dng.priv_entries.items():
+        if tag in (0x021A, 0x021B, 0x0004, 0x0005):
+            continue
+        if entry["inline"]:
+            raw = bytes(dng.data[entry["entry_off"] + 8:entry["entry_off"] + 12])
+        else:
+            raw = bytes(dng.data[entry["value_off"]:entry["value_off"] + entry["size"]])
+        digest[tag] = hashlib.sha1(raw).hexdigest()
+    return digest
+
+
+def plan_rebuild_makernote(target, new_table, new_matrix_table, added, nrec,
+                           info):
+    """Rebuild a packed AOC MakerNote at the end of the file and grow it.
+
+    K20D-era DCU DNGs put a completely packed 24,280 B MakerNote right before
+    SubIFD0 (largest internal gap 1 B), so the 1,000 B a 12-parameter 0x021A
+    needs cannot go inside the block.  Because the AOC tag values are absolute
+    file offsets, the whole block can be copied to EOF, its value offsets
+    rebased by delta, the new payload appended at the copy's tail and the EXIF
+    0x927C entry repointed: no TIFF offset, image strip or tile moves.
+
+    Returns a plan with kind "rebuild_makernote" that write_patch applies and
+    verify_output checks (block bounds, the 0x927C entry and a fingerprint of
+    every other private tag).
+    """
+    if getattr(target, "container", "private") != "makernote":
+        raise DngError(
+            "not enough free space to move 0x021A: the private block has no "
+            "free run, and the block-rebuild path only handles DCU-style "
+            "EXIF MakerNotes (tag 0x927C with absolute offsets)")
+    if not getattr(target, "priv_abs", False):
+        raise DngError(
+            "EXIF MakerNote with relative offsets is not supported by the "
+            "block-rebuild path")
+
+    new_off = _align_up(len(target.data), 4)
+    delta = new_off - target.priv_off
+    block = bytearray(target.data[target.priv_off:target.priv_end])
+    for entry in target.priv_entries.values():
+        if entry["inline"]:
+            continue
+        struct.pack_into(target.priv_endian + "I", block,
+                         entry["entry_off"] - target.priv_off + 8,
+                         entry["value_off"] + delta)
+
+    relocated_preview = {}
+    for tag, value in _preview_offsets(target).items():
+        if not (target.priv_off <= value < target.priv_end):
+            continue
+        entry = target.priv_entries[tag]
+        struct.pack_into(target.priv_endian + "I", block,
+                         entry["value_off"] - target.priv_off, value + delta)
+        relocated_preview[tag] = value + delta
+
+    rel_table = _align_up(len(block), 2)
+    rel_blocks = _align_up(rel_table + len(new_table), 2)
+    new_len = rel_blocks + len(new_matrix_table)
+    if new_len > len(block):
+        block.extend(b"\x00" * (new_len - len(block)))
+    block[rel_table:rel_table + len(new_table)] = new_table
+    block[rel_blocks:rel_blocks + len(new_matrix_table)] = new_matrix_table
+    for tag, rel, length in ((0x021A, rel_table, len(new_table)),
+                             (0x021B, rel_blocks, len(new_matrix_table))):
+        entry = target.priv_entries[tag]
+        eoff = entry["entry_off"] - target.priv_off
+        struct.pack_into(target.priv_endian + "I", block, eoff + 4, length)
+        struct.pack_into(target.priv_endian + "I", block, eoff + 8, new_off + rel)
+
+    plan = {
+        "kind": "rebuild_makernote",
+        "new_table": new_table,
+        "nrec": nrec,
+        "added": added,
+        "table_old_end": target.table_off + target.table_len,
+        "table_new_end": new_off + rel_table + len(new_table),
+        "table_growth": len(new_table) - target.table_len,
+        "need": max(0, len(new_table) - target.table_len),
+        "table_gap": 0,
+        "table_next": target.table_off + target.table_len,
+        "new_table_off": new_off + rel_table,
+        "table_relocated": True,
+        "new_block_count": target.block_count + len(added),
+        "new_blocks_len": len(new_matrix_table),
+        "new_matrix_table": new_matrix_table,
+        "blocks_old_end": target.blocks_off + target.blocks_len,
+        "blocks_next": target.blocks_off + target.blocks_len,
+        "blocks_gap": 0,
+        "new_blocks_off": new_off + rel_blocks,
+        "blocks_relocated": True,
+        "table_fill": b"",
+        "blocks_fill": b"",
+        "new_block": bytes(block),
+        "new_block_off": new_off,
+        "old_block_off": target.priv_off,
+        "old_block_len": target.priv_len,
+        "new_block_len": len(block),
+        "block_growth": len(block) - target.priv_len,
+        "file_growth": new_off + len(block) - len(target.data),
+        "priv_digest": _private_tag_digest(target),
+        "relocated_preview": relocated_preview,
+    }
+    plan.update(info)
+    return plan
+
+
 def plan_patch(target, donor, missing, xform=None):
     """Compute the 0x021A/0x021B rewrite plan without touching the file."""
     new_table, nrec, added, info = build_new_table(target, donor, missing, xform)
@@ -1388,10 +1574,11 @@ def plan_patch(target, donor, missing, xform=None):
             align=2,
         )
         if start is None:
-            raise DngError(
-                "not enough free space to move 0x021A: need %d bytes in the "
-                "private block; refusing to overwrite preview or other tags"
-                % length)
+            # The block is packed (K20D: 24,280 B, largest gap 1 B).  A
+            # DCU-style MakerNote can be rebuilt at the end of the file
+            # without moving a single image byte; see plan_rebuild_makernote.
+            return plan_rebuild_makernote(target, new_table, new_matrix_table,
+                                          added, nrec, info)
         new_table_off = start
         if reserve_blocks:
             new_blocks_off = _align_up(start + len(new_table), 2)
@@ -1411,10 +1598,8 @@ def plan_patch(target, donor, missing, xform=None):
             align=2,
         )
         if new_blocks_off is None:
-            raise DngError(
-                "not enough free space for 0x021B: need %d bytes in the "
-                "private block; refusing to overwrite preview or other tags"
-                % new_blocks_len)
+            return plan_rebuild_makernote(target, new_table, new_matrix_table,
+                                          added, nrec, info)
     blocks_relocated = new_blocks_off != target.blocks_off
 
     table_fill = b""
@@ -1469,8 +1654,25 @@ def check_plan_fills(plan, force):
     return msg
 
 
+def _write_rebuilt_makernote(target, plan, out):
+    """Append the rebuilt AOC block and repoint EXIF 0x927C at it."""
+    off = plan["new_block_off"]
+    if len(out) < off:
+        out.extend(b"\x00" * (off - len(out)))
+    out.extend(plan["new_block"])
+    makernote = target.makernote_entry
+    if makernote is None:
+        raise DngError("rebuild plan without an EXIF MakerNote entry")
+    struct.pack_into(target.endian + "I", out, makernote["entry_off"] + 4,
+                     plan["new_block_len"])
+    struct.pack_into(target.endian + "I", out, makernote["entry_off"] + 8, off)
+
+
 def write_patch(target, plan, out):
     """Apply a plan to a mutable bytearray."""
+    if plan.get("kind") == "rebuild_makernote":
+        _write_rebuilt_makernote(target, plan, out)
+        return
     if plan.get("kind") == "add_tags":
         # Data first, then the rebuilt IFD (its new entries overlap the old
         # 0x0200/0x0201/0x0205 bytes, which have already been relocated).
@@ -1522,8 +1724,42 @@ def write_patch(target, plan, out):
                          value)
 
 
+def _verify_rebuilt_makernote(check, plan):
+    """The rebuilt block must be at the planned offset and change nothing else."""
+    if check.container != "makernote":
+        raise DngError("verification failed: maker note container lost")
+    if check.priv_off != plan["new_block_off"]:
+        raise DngError("verification failed: maker note at 0x%X != 0x%X"
+                       % (check.priv_off, plan["new_block_off"]))
+    if check.priv_len != plan["new_block_len"]:
+        raise DngError("verification failed: maker note length %d != %d"
+                       % (check.priv_len, plan["new_block_len"]))
+    if len(check.data) != plan["new_block_off"] + plan["new_block_len"]:
+        raise DngError(
+            "verification failed: file size %d != end of the rebuilt maker "
+            "note 0x%X" % (len(check.data),
+                           plan["new_block_off"] + plan["new_block_len"]))
+    digest = _private_tag_digest(check)
+    changed = [tag for tag in plan["priv_digest"]
+               if digest.get(tag) != plan["priv_digest"][tag]]
+    if changed:
+        raise DngError("verification failed: private tag(s) changed: %s"
+                       % ", ".join("0x%04X" % tag for tag in changed))
+    for tag, value in plan["relocated_preview"].items():
+        entry = check.priv_entries.get(tag)
+        if entry is None:
+            raise DngError("verification failed: preview tag 0x%04X missing"
+                           % tag)
+        got = _u32(check.data, entry["value_off"], check.priv_endian)
+        if got != value:
+            raise DngError("verification failed: preview tag 0x%04X offset "
+                           "0x%X != 0x%X" % (tag, got, value))
+
+
 def verify_output(out_path, plan):
     check = Dng(out_path)
+    if plan.get("kind") == "rebuild_makernote":
+        _verify_rebuilt_makernote(check, plan)
     if check.missing:
         raise DngError("verification failed: still missing %s" % check.missing)
     if check.table_off != plan["new_table_off"]:
@@ -1647,6 +1883,11 @@ def convert_file(target_path, out_path, donor, *, overwrite=False, force=False,
         "calibration": calibration,
         "calibration_applied": xform is not None,
         "container": target.container,
+        "makernote_rebuilt": plan.get("kind") == "rebuild_makernote",
+        "new_makernote_off": plan.get("new_block_off"),
+        "old_makernote_off": plan.get("old_block_off"),
+        "makernote_growth": plan.get("block_growth"),
+        "file_growth": plan.get("file_growth"),
     }
 
 
@@ -1765,7 +2006,7 @@ def main(argv=None):
                         "(k1 for K-1, k1ii for K-1 Mark II, kf; "
                         "k30/k01/k50/q7/mx1 for bodies with no "
                         "0x021A/0x021B table; 645d for the 11-parameter "
-                        "record layout)")
+                        "record layout; k20d for the 8-parameter table)")
     p.add_argument("--out", help="output DNG path")
     p.add_argument("--in-place", action="store_true", help="modify the target file")
     p.add_argument("--no-backup", action="store_true",

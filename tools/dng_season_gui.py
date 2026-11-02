@@ -35,7 +35,7 @@ except Exception:  # Pillow is optional in a source checkout.
 import dng_season_params as core
 
 APP_TITLE = "PDCU MOD"
-APP_VERSION = "2.7"
+APP_VERSION = "2.8"
 APP_INTRO = ("PDCU 宾得相机DNG文件补齐四季色彩矩阵及曲线参数工具"
              "(春红HARUBENI、夏至KATEN、九秋KYUSHU、冬日FUYUNO)")
 COPYRIGHT = "版权所有 © 2026 KimHoLau X deepseek harness"
@@ -1276,8 +1276,8 @@ class App(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("%s v%s" % (APP_TITLE, APP_VERSION))
-        self.geometry("1200x900")
-        self.minsize(1120, 870)
+        self.geometry("1200x940")
+        self.minsize(1120, 910)
         self.configure(bg=BG)
 
         self.targets: list[str] = []
@@ -1333,7 +1333,7 @@ class App(tk.Tk):
 
     def _center_window(self) -> None:
         self.update_idletasks()
-        width, height = 1200, 900
+        width, height = 1200, 940
         x = max(0, (self.winfo_screenwidth() - width) // 2)
         y = max(0, (self.winfo_screenheight() - height - 80) // 2)
         self.geometry("%dx%d+%d+%d" % (width, height, x, y))
@@ -1959,6 +1959,14 @@ class App(tk.Tk):
                         self.queue.put((
                             "log",
                             "  来源：EXIF MakerNote 0x927C（DCU 另存 DNG）"))
+                    if res.get("makernote_rebuilt"):
+                        self.queue.put((
+                            "log",
+                            "  提示：MakerNote 整块已重建到文件尾（0x%X，%+d B）；"
+                            "原块 0x%X 保留为死区，raw / 预览 / 缩略图未移动。"
+                            % (res.get("new_makernote_off") or 0,
+                               res.get("makernote_growth") or 0,
+                               res.get("old_makernote_off") or 0)))
                     if res.get("layout_upgraded"):
                         self.queue.put((
                             "log",

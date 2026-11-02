@@ -41,17 +41,18 @@ PDCU 宾得相机DNG文件补齐四季色彩矩阵及曲线参数工具(春红HA
 | 10 | **PENTAX K-S2** | A | KF×Y(K-S2) | 4.3×10⁻⁵ | 九机同场景，CM2 警告 1.3×10⁻² |
 | 11 | **PENTAX 645Z** | A | KF×Y(645Z) | 4.4×10⁻⁵ | 九机同场景，CM2 警告 2.7×10⁻³ |
 | 12 | **PENTAX 645D** | A | KF×Y(645D)，Y 来自自身 0x021B；0x021A 重建为 12 参数 | 5.8×10⁻⁵ | PDCU 菜单 + 四季渲染实测（v2.2），CM2 pass 4.0×10⁻⁵ |
-| 13 | **PENTAX K-50** | B | ColorMatrix2 推算 Y | 5.7×10⁻⁵ | 九机同场景 + K-3 渲染对照 |
-| 14 | **PENTAX K-01** | B | ColorMatrix2 推算 Y | 5.5×10⁻⁵ | PDCU 渲染复核（舞狮），无同场景定量 |
-| 15 | **PENTAX K-30** | B | ColorMatrix2 推算 Y | 5.4×10⁻⁵ | PDCU 渲染复核（街景），无同场景定量 |
-| 16 | **PENTAX MX-1** | B | ColorMatrix2 推算 Y（1/1.7"） | 1.07×10⁻⁴ | PDCU 菜单 + 四季渲染 + 同场景比值 + As Shot 零变化（v2.3） |
-| 17 | **PENTAX Q7** | B | ColorMatrix2 推算 Y（小底） | 5.1×10⁻⁵ | 九机同场景，但 Y 不在单反校准线上 |
+| 13 | **PENTAX K20D** | A | KF×Y，Y 来自自身 0x021B；0x021A 重建为 12 参数，MakerNote 整块搬到文件尾 | 5.8×10⁻⁵ | PDCU 5.10.2.2 菜单实测（8 参数不列、12 参数列出，v2.8） |
+| 14 | **PENTAX K-50** | B | ColorMatrix2 推算 Y | 5.7×10⁻⁵ | 九机同场景 + K-3 渲染对照 |
+| 15 | **PENTAX K-01** | B | ColorMatrix2 推算 Y | 5.5×10⁻⁵ | PDCU 渲染复核（舞狮），无同场景定量 |
+| 16 | **PENTAX K-30** | B | ColorMatrix2 推算 Y | 5.4×10⁻⁵ | PDCU 渲染复核（街景），无同场景定量 |
+| 17 | **PENTAX MX-1** | B | ColorMatrix2 推算 Y（1/1.7"） | 1.07×10⁻⁴ | PDCU 菜单 + 四季渲染 + 同场景比值 + As Shot 零变化（v2.3） |
+| 18 | **PENTAX Q7** | B | ColorMatrix2 推算 Y（小底） | 5.1×10⁻⁵ | 九机同场景，但 Y 不在单反校准线上 |
 
 > 表里的 max|ΔR| 是四季风格 R = M季节·inv(M基准) 与 KF 原生的最大差；Q13 一个 LSB
 > 是 1.22×10⁻⁴，所以**全部机型都在一个量化步长以内**。
 > S 档：原生或等价原生（4 台）
-> A 档：机身 0x021B 基准精确校准（8 台）
-这 8 台都有 `0x021B` 基准矩阵，工具运行时算 `Y = inv(M_KF[0])·M_body[0]`，
+> A 档：机身 0x021B 基准精确校准（9 台）
+这 9 台都有 `0x021B` 基准矩阵，工具运行时算 `Y = inv(M_KF[0])·M_body[0]`，
 再把 KF 四季矩阵乘上 Y。数学上就是 Pentax 生成各机身表的做法，所以是“精确解”。
 > B 档：ColorMatrix2 推算（5 台）
 这 5 台没有 `0x021A`/`0x021B`，Y 只能由 DNG 的 ColorMatrix2 反推：
@@ -71,18 +72,21 @@ PDCU 宾得相机DNG文件补齐四季色彩矩阵及曲线参数工具(春红HA
 [`docs/PDCU-KYUSHU-四季对比判定.md`](docs/PDCU-KYUSHU-四季对比判定.md)，
 对比图 [`docs/PDCU-KYUSHU-四季对比.jpg`](docs/PDCU-KYUSHU-四季对比.jpg)。
 
-## 所有机型排名统计（2026-10-29）
-[`docs/PDCU-支持机型四季水准排名.md`](docs/PDCU-支持机型四季水准排名.md)。
+## 所有机型排名统计（2026-11-02，加权评分）
+[`docs/PDCU-支持机型四季水准排名.md`](docs/PDCU-支持机型四季水准排名.md)：
+按「数据出身 30% / 端到端验证 50% / 实现代价 10% / 风格残差 10%」打分排序，
+与上面的档位适配表顺序不同（例如 K-50 以 76.8 分排在 K20D 74.2 分之前，
+因为九机同场景的验证分更高）。
 
 ## 运行
 
-发布文件：`dist/PDCU-Season-Params.exe`（或 `dist/PDCU-Season-ParamsV2.7.zip`）
+发布文件：`dist/PDCU-Season-Params.exe`（或 `dist/PDCU-Season-ParamsV2.8.zip`）
 
 双击运行，首次运行 Windows SmartScreen 可能提示
 “未知发布者”，选择“更多信息 -> 仍要运行”。
 
 **命名例外**：产品名是 **PDCU MOD**，但发布文件仍沿用
-`PDCU-Season-Params.exe` / `PDCU-Season-ParamsV2.7.zip`，
+`PDCU-Season-Params.exe` / `PDCU-Season-ParamsV2.8.zip`，
 `InternalName` / `OriginalFilename` 也保持 `PDCU-Season-Params`。
 这是为了兼容既有发布、快捷方式和脚本；Windows 文件属性里的
 `FileDescription` / `ProductName` 仍为 **PDCU MOD**，不随文件名变化。
@@ -94,6 +98,21 @@ macOS 上要用 py2app 打包（`python3 setup.py py2app`），打包步骤与
 > 发布物命名沿用旧名 `PDCU-Season-Params`（exe / zip / InternalName /
 > OriginalFilename），产品名与文件属性中的 FileDescription / ProductName
 > 仍是 **PDCU MOD**；这是兼容既有发布与脚本的例外，详见「运行」。
+- **v2.8**：新增 **PENTAX K20D**（PDCU 从 PEF 转换的 DNG）。K20D 的 AOC MakerNote
+  是满的（24,280 B，最大空隙 1 B），`0x021A` 是 8 参数 / 18 字节旧布局；
+  工具把整块 MakerNote 重建到文件尾（内部绝对偏移按位移重定位），在块尾
+  追加 12 参数 / 26 字节的新 `0x021A` 与 19 个矩阵的新 `0x021B`，
+  raw / 预览 / 缩略图一个字节不动，文件 +25,280 B，旧块留作死区。
+  四季矩阵 = KF 四季矩阵 × `Y = inv(M_KF[0])·M_K20D[0]`，相对风格
+  与 KF 差 ≤5.8×10⁻⁵（≤0.46 个 Q13 LSB）。新增的 7–10 号参数槽按目标布局的
+  默认值填（`0,0,0,0xFFFF`，即 KF 自己的约定）；全填 `0xFFFF` 会让 PDCU 的默认
+  显影抬亮变平（实测 −9%），已修正。PDCU 5.10.2.2 实测：8 参数看不到四季，
+  12 参数列出并渲染四项，四项方向与 KF 原生机身一致、默认显影不变（62.4/51.7/42.1
+  vs 原名 62.5/51.4/41.9、机身预览 60.6/50.7/42.7）。四项效果图见
+  [`docs/PDCU-K20D-四季效果.png`](docs/PDCU-K20D-四季效果.png)，
+  修复前后的 As Shot 对照见 [`docs/PDCU-K20D-PDCU实测.png`](docs/PDCU-K20D-PDCU实测.png)。
+  顺带修好了 K20D 的文件选择器预览（`preview_jpeg` 回落到 SubIFD 的 4672×3104 JPEG）。
+  分析见 [`docs/PDCU-K20D-KF四季移植.md`](docs/PDCU-K20D-KF四季移植.md)。
 - **v2.7**：文件选择器加入 DNG 机内 JPEG 实时预览（约 720×480），后台读取
   不卡窗口；单击文件夹后按「打开」进入，并补了「此电脑」与主目录/桌面/下载/
   图片快捷位置。「季节参数来源」选项悬停时会显示适配机型。**转换逻辑与输出
@@ -162,6 +181,54 @@ macOS 上要用 py2app 打包（`python3 setup.py py2app`），打包步骤与
   并用 K-30 色彩空间校准 KF 四季矩阵。K-30 自动识别。
 - **v1.5**：内置 KF 四季参数，K-70 自动识别。
 - **v1.4**：内置 KF 数据；KF / K-70 按“基础矩阵相同”精确移植。
+
+### v2.8 打包记录（2026-11-01）
+
+构建：Python 3.14.3 + PyInstaller 6.22.3，`PDCU-Season-Params.spec`（onefile、UPX），
+FileVersion / ProductVersion **2.8.0.0**。
+
+| 产物 | 大小 |
+|---|---:|
+| `dist/PDCU-Season-Params.exe` | 19,384,033 B |
+| `dist/PDCU-Season-ParamsV2.8.zip`（exe + 使用说明） | 19,130,016 B |
+
+打包后 exe 的 **15 组**机型自检全部通过：前 14 组与 v2.7 记录逐字节相同，
+新增的 K20D 输出与 PDCU 5.10.2.2 实测通过的那份 `sample/K20D_all.dng` 逐字节相同。
+
+| 机型 | 自检参数 | 自检输出 SHA-256 |
+|---|---|---:|
+| K20D | `--selftest-k20d` | `5E3C201B9D814894D930F5AAEB123594160B3A9B2435AF15EAD8D153143165E9` |
+| K-1 Mark II | `--selftest-k1ii` | `33FCCDF4D3DC42B0ED242673C9F0A7DCDABB5A07F247D86287B0058696971493` |
+| K-1 | `--selftest` | `5F0B52CC1D116EAA48224C1A38722EBE6823ABADA3BDD7ED7F533C275E987584` |
+| K-70 | `--selftest-kf` | `5B44C9C1E9970C50928232255F74385FE15841345D8278E47BC77AFE422570D6` |
+| K-3 | `--selftest-kf` | `29C45ED9AB7812389BFFC825D67AD84FBF0A11A20828FE0CD3F94C8C1FF36D2B` |
+| K-3 II | `--selftest-kf` | `0829FA8975A9B3A38AE910B7446DECD51404CC49585487C6553CDADCD668376B` |
+| KP | `--selftest-kf` | `3BF7F56E17F2CDB83847E9C236B32F28F79E3A2CBC3C05330B83810601A91E22` |
+| K-S2 | `--selftest-kf` | `BA0DC8BA30CEF971DCD38DC7BCDE271DD23368F6C06D48BF071CFFF9096E9FAC` |
+| 645Z | `--selftest-kf` | `768EC1AAE05BD5E84AD374B7122DE711273054C8DE379BF1ECB89B4346988135` |
+| 645D | `--selftest-645d` | `E9497DE8099EB53401922103DC46144640EFE416080AE85B36AA40CD07AEBE62` |
+| K-30 | `--selftest-k30` | `328E52A671C26AA5E8524003E51F78A2F55475AA9665E4C6EECA5EB648A25AEC` |
+| K-01 | `--selftest-k01` | `06B87D743391237AC54EDC847CA8FA97982EDF87BC568F3311E5415B813B3745` |
+| K-50 | `--selftest-k50` | `D45021DE23B86628A4D3D3E862782C4149C06614AAD07E53017B044CB4F75F1A` |
+| Q7 | `--selftest-q7` | `7113270F5448D828C870F502994A138A57DEE27C4562D796437B69E82395600D` |
+| MX-1 | `--selftest-mx1` | `6CCF0D6238B28CEDF2DB040552A5802A204A4A4BD62BDD3F3188B50C3CE9448F` |
+
+界面：窗口高度 900 → 940（`minsize` 1120×910），容纳第 5 个来源选项；
+版本号已同步到标题栏与右上角 chip。
+
+冻结版的预览路径也单独验证过（`--preview-selftest sample\K20D.dng`）：
+`frozen True`、`pillow 12.1.1`、`preview bytes 1177094`、`decoded 4672x3104 RGB`、
+ImageTk 与 PNG photo 都是 248×165；K20D 没有私有块预览，走的是 v2.8 新增的
+SubIFD 回落。冻结版 GUI 启动后窗口正常创建（标题栏与 chip 都是 v2.8，5 个来源选项与四季卡片完整显示），
+界面截图已更新为 `PDCU-GUI.png`。
+
+SHA-256：
+
+```
+exe    A75B397F1A5D0D0A193536959F068B624CEC1FA7F703056417278A8D3CFFAB65
+zip    7B701F92E1ED31AEB702A064475CE770A767B935B4F69BEBDBCA92B73481C18C
+K20D   5E3C201B9D814894D930F5AAEB123594160B3A9B2435AF15EAD8D153143165E9
+```
 
 ### v2.7 打包记录（2026-10-30）
 
@@ -402,6 +469,7 @@ KP      3BF7F56E17F2CDB83847E9C236B32F28F79E3A2CBC3C05330B83810601A91E22
 | **PENTAX K-5 II / K-5 II s** | 内置 KF 四季参数 + 自动校准 | 私有块是**大端**、25 条记录 / 18 个矩阵；两台矩阵表逐字节相同 |
 | **PENTAX 645Z** | 内置 KF 四季参数 + 自动校准 | 基准矩阵与 K-3 不同，工具会算出 645Z 自己的 Y |
 | **PENTAX 645D** | 内置 645D 四季参数 | v2.2 新增；11 参数表自动重建为 12 参数，四季矩阵按机身校准 |
+| **PENTAX K20D** | 内置 K20D 四季参数 | v2.8 新增；PDCU 转换的 DNG（相机只写 PEF）；8 参数表自动重建为 12 参数，MakerNote 整块搬到文件尾（+25 KB） |
 | **PENTAX KP** | 内置 KF 四季参数 + 自动校准 | v2.0 新增；有 `0x021B`，按机身校准 |
 | **PENTAX K-S2** | 内置 KF 四季参数 + 自动校准 | v2.0 新增；有 `0x021B`，按机身校准 |
 | **PENTAX K-50** | 内置 K-30 系列四季参数 | v2.0 新增；无表、大端；Y 由 ColorMatrix2 推算 |
@@ -454,12 +522,13 @@ v1.9 起还支持 **DCU 5 另存的 DNG**：它们的 Pentax MakerNote 在 EXIF 
    文件、donor 与输出目录都用深色自绘选择器：单击文件夹后按「打开」进入，
    也可用「此电脑」切换驱动器、用「主目录 / 桌面 / 下载 / 图片」快速定位；
    支持路径输入、返回上级和取消；
-2. 选择「季节参数来源」（四个内置选项，添加文件后自动识别机型，面板只显示来源名称）：
+2. 选择「季节参数来源」（五个内置选项，添加文件后自动识别机型，面板只显示来源名称）：
    - **内置 K-1 / K-1 Mark II**：只适用于 `PENTAX K-1`、`PENTAX K-1 Mark II`；
    - **内置 KF / K-70**：只适用于 `PENTAX KF / K-70`，以及
      `K-3 / K-3 II / K-5 II / K-5 II s / 645Z / KP / K-S2`；
    - **内置 K-30 系列**：只适用于 `PENTAX K-30 / K-01 / K-50 / Q7 / MX-1`；
    - **内置 645D**：只适用于 `PENTAX 645D`；
+   - **内置 K20D**：只适用于 `PENTAX K20D`（PDCU 转换的 DNG）；
    - **高级**：选择一张 DNG 作为来源；其他机型可勾选「允许使用其他机型的 DNG」。
    内置来源与机型不匹配时，工具会在转换前拒绝并明确提示，不会生成输出文件；
    跨机型开关只影响「高级」里的自定义 DNG 来源。
@@ -469,7 +538,7 @@ v1.9 起还支持 **DCU 5 另存的 DNG**：它们的 Pentax MakerNote 在 EXIF 
 4. 点“开始转换”，完成后点“打开输出目录”。
 
 添加文件后，工具会自动读取机型并选中对应来源；K-1 Mark II 自动使用 `k1ii` 数据，
-K-3 / K-5 / 645Z / KP / K-S2 使用 KF 数据并按机身自动适配。
+K-3 / K-5 / 645Z / KP / K-S2 使用 KF 数据并按机身自动适配，K20D 使用 `k20d` 数据。
 
 日志里的 `按目标机身校准：Y = … style: median 8.2e-05 …` 就是这次校准：
 `median` 越小说明两台机身的风格表越一致；超过 3×10⁻³ 会提示“风格表不一致”。
@@ -500,13 +569,24 @@ K-3 / K-5 / 645Z / KP / K-S2 使用 KF 数据并按机身自动适配。
   v1.7 已在 PDCU 中实测识别为 PENTAX K-01 并列出四季。
 - 645D 有 0x021A / 0x021B，但记录是 **11 参数 / 24 字节**（PDCU 只认 12 参数 /
   26 字节）。工具会把整张表重建成 12 参数：原有 24 条记录逐字段保留，只补一个
-  `0xFFFF` 的参数 10 槽；实测 `0xFFFF` 与 `0` 渲染逐像素相同。副作用是 PDCU
-  对 645D 的默认显影会切到新路径，实测比旧路径更接近机身 JPEG 预览
-  （均值 154.6/114.8/100.6 vs 预览 161.9/115.3/100.5；旧路径 121.2/83.7/74.0）。
+  `0xFFFF` 的参数 10 槽；实测 `0xFFFF` 与 `0` 渲染逐像素相同。645D 只缺 10 号
+  槽（K20D 缺 7–10 四个，才有填充值问题），所以 K20D 的填充修正在 645D 上是
+  空操作。2026-11-02 复核：旧布局 122.1/81.4/70.1 → 12 参数 158.9/115.4/98.6，
+  机身预览 161.8/115.3/100.4，也就是升级把默认显影**修正到**贴近机身预览。
   如果不希望默认显影改变，请不要对 645D 用本工具。
 - 645D 的四季相对风格与 KF 差 ≤5.8×10⁻⁵，但它自己的旧风格表与 KF 不同
   （24 个同名模式的中位差 7.3×10⁻²），所以工具用 645D 专用内置数据，
   不会被“风格表不一致”拦住。
+- K20D 是 v2.8 新增，情况与 645D 相邻但更极端：它**有** `0x021A`/`0x021B`，
+  但是 8 参数 / 18 字节的旧布局，而且 AOC MakerNote 已经排满（最大空隙 1 B）。
+  工具会先把整张表重建成 12 参数（PDCU 实测：8 参数看不到四季，12 参数列出），
+  再把整个 MakerNote 复制到文件尾、按位移重定位内部绝对偏移、在块尾追加两张新表，
+  改 EXIF `0x927C` 的 offset/count。raw / 预览 / 缩略图不移动，
+  原文件只有 5 B 变化，**文件 +25,280 B**，原块留作死区。
+  四季相对风格与 KF 差 ≤5.8×10⁻⁵；PDCU 5.10.2.2 已实测列出并渲染四项。
+  注意：记录布局升级可能像 645D 那样改变 PDCU 的默认显影，未在 K20D 上逐项记录；
+  如果不希望默认显影变化，请不要对 K20D 用本工具。详见
+  [`docs/PDCU-K20D-KF四季移植.md`](docs/PDCU-K20D-KF四季移植.md)。
 - 645Z / K-3 / K-S2 / KP 没有机内四季数据，但它们的矩阵表与 KF 只差一次输入校准，
   v1.8 / v2.0 按目标机身校准后四季风格与 KF 原生一致（645Z、KP、K-S2 需要自己的 `Y`）。
 - 工具会用目标 DNG 的 `0xC622`（ColorMatrix2）复核 `0x021B` 基准：两条路算出的
