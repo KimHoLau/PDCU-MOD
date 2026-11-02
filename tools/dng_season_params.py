@@ -48,6 +48,13 @@ the whole table in that layout (existing records keep every field they had;
 the missing parameter 10 slot is written as 0xFFFF).  --builtin 645d carries
 the 645D-calibrated season matrices.
 
+PENTAX K10D is one generation older than the 645D: 5 parameters per record
+(12 bytes), two mode records and two matrices in a DNGPrivateData block whose
+offsets are relative and which has a 19 KB zero gap, so the rebuilt tables go
+inside the block and the file does not grow.  --builtin k10d carries the
+K10D-calibrated season matrices (its ColorMatrix2 disagrees with 0x021B; PDCU
+reads 0x021B only).
+
 Older K-1 firmware (for example v1.50) may reserve a padded 0x021A block and
 leave no gap after 0x021B.  In that case the tool treats the trailing 0x021A
 bytes as reserved and relocates the whole 0x021B matrix table to a safe free
@@ -83,6 +90,7 @@ import time
 import dng_report
 import season_645d_data
 import season_k01_data
+import season_k10d_data
 import season_k1_data
 import season_k1ii_data
 import season_k20d_data
@@ -125,6 +133,7 @@ MODEL_TO_DONOR_KIND = {
     "PENTAX K-S2": "kf",
     "PENTAX 645D": "645d",
     "PENTAX K20D": "k20d",
+    "PENTAX K10D": "k10d",
     "PENTAX K-30": "k30",
     "PENTAX K-01": "k01",
     "PENTAX K-50": "k50",
@@ -170,6 +179,9 @@ BUILTIN_SOURCES = {
     "builtin_k20d": BuiltinSource(
         "builtin_k20d", "内置 K20D", ("k20d",),
         "季节来源：内置 K20D 四季参数"),
+    "builtin_k10d": BuiltinSource(
+        "builtin_k10d", "内置 K10D", ("k10d",),
+        "季节来源：内置 K10D 四季参数"),
 }
 BUILTIN_SOURCE_MODELS = {
     source.key: frozenset(
@@ -189,6 +201,7 @@ AUTO_SELECT_GROUPS = (
                                "PENTAX Q7", "PENTAX MX-1"))),
     ("builtin_645d", frozenset(("PENTAX 645D",))),
     ("builtin_k20d", frozenset(("PENTAX K20D",))),
+    ("builtin_k10d", frozenset(("PENTAX K10D",))),
     ("builtin_kf", frozenset(("PENTAX K-3", "PENTAX K-3 II", "PENTAX K-5 II",
                               "PENTAX K-5 II s", "PENTAX 645Z", "PENTAX KP",
                               "PENTAX K-S2"))),
@@ -207,6 +220,7 @@ SELFTEST_DONOR_FLAGS = {
     "--selftest-q7": "q7",
     "--selftest-mx1": "mx1",
     "--selftest-k20d": "k20d",
+    "--selftest-k10d": "k10d",
 }
 SELFTEST_FLAGS = tuple(SELFTEST_DONOR_FLAGS) + ("--selftest-cross",)
 
@@ -1186,6 +1200,7 @@ _BUILTIN_DATA_MODULES = {
     "q7": season_q7_data,
     "mx1": season_mx1_data,
     "k20d": season_k20d_data,
+    "k10d": season_k10d_data,
 }
 BUILTIN_DONOR_KINDS = tuple(_BUILTIN_DATA_MODULES)
 
@@ -2006,7 +2021,8 @@ def main(argv=None):
                         "(k1 for K-1, k1ii for K-1 Mark II, kf; "
                         "k30/k01/k50/q7/mx1 for bodies with no "
                         "0x021A/0x021B table; 645d for the 11-parameter "
-                        "record layout; k20d for the 8-parameter table)")
+                        "record layout; k20d for the 8-parameter table; "
+                        "k10d for the 5-parameter table)")
     p.add_argument("--out", help="output DNG path")
     p.add_argument("--in-place", action="store_true", help="modify the target file")
     p.add_argument("--no-backup", action="store_true",
