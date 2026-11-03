@@ -83,7 +83,7 @@ PDCU 宾得相机DNG文件补齐四季色彩矩阵及曲线参数工具(春红HA
 
 ## 运行
 
-发布文件：`dist/PDCU-Season-Params.exe`（或 `dist/PDCU-Season-ParamsV2.11.zip`）
+发布文件：`dist/PDCU-Season-Params.exe`（或 `dist/PDCU-Season-ParamsV2.12.zip`）
 
 双击运行，首次运行 Windows SmartScreen 可能提示
 “未知发布者”，选择“更多信息 -> 仍要运行”。
@@ -113,7 +113,7 @@ macOS 上要用 py2app 打包（`python3 setup.py py2app`），打包步骤与
   键盘选行必须用 `HOME`，不能连按 `UP` 回顶；上一份“\*ist DL 不可移植”的分析
   就是在这里选错了行，本次一并更正（详见
   [`docs/PDCU-istDL-KF四季移植分析.md`](docs/PDCU-istDL-KF四季移植分析.md)）。
-  界面：窗口高度 1008 → 1042（`minsize` 1120×1012），容纳第 8 个来源选项；
+  界面：窗口高度 978 → 1012（`minsize` 1120×1012），容纳第 8 个来源选项；
   版本号同步到 2.12。
 - **v2.11**：修复 **DCU 5 转出的 DNG 打补丁后 PDCU 不出图**。把 AOC MakerNote
   整块搬到文件尾时，工具把 `0x0004` / `0x0005` 当成"预览偏移"，只要数值落在块内就
@@ -238,6 +238,40 @@ macOS 上要用 py2app 打包（`python3 setup.py py2app`），打包步骤与
   并用 K-30 色彩空间校准 KF 四季矩阵。K-30 自动识别。
 - **v1.5**：内置 KF 四季参数，K-70 自动识别。
 - **v1.4**：内置 KF 数据；KF / K-70 按“基础矩阵相同”精确移植。
+
+### v2.12 打包记录（2026-11-03）
+
+构建：Python 3.14.3 + PyInstaller 6.22.3，`PDCU-Season-Params.spec`（onefile），
+FileVersion / ProductVersion **2.12.0.0**。
+
+| 产物 | 大小 |
+|---|---:|
+| `dist/PDCU-Season-Params.exe` | 19,394,239 B |
+| `dist/PDCU-Season-ParamsV2.12.zip`（exe + 使用说明） | 19,139,885 B |
+
+打包后 exe 的 **19 组**机型自检全部通过：18 组与 v2.11 记录逐字节相同，第 19 组是新增的
+*ist DL（产物与源码 CLI / GUI 逐字节相同）。
+
+| 机型 | 自检参数 | 自检输出 SHA-256 |
+|---|---|---|
+| PENTAX *ist DL | `--selftest-istdl sample\ist DL.dng` | `A5986CA863787DC9EB29DBBBD98A4B096171F6561A5752C978A41564982CE63C` |
+
+其余 18 组（K-1 / K-1 Mark II / K-70 / K-3 / K-3 II / KP / K-S2 / 645Z / 645D /
+K-30 / K-01 / K-50 / Q7 / MX-1 / K20D / K10D / K-7，加上 v2.11 那份 DCU 转出的
+K-1 Mark II）与 v2.11 的 SHA-256 记录逐字节相同。
+
+界面：源码与 exe 的标题栏、右上角 chip 都是 v2.12，8 个来源选项完整显示；
+窗口 1200×1012；`PDCU-GUI.png` 已按 v2.12 更新。
+
+zip 内文件：`PDCU-Season-Params.exe` + `使用说明.txt`（首行 PDCU MOD v2.12）。
+
+SHA-256：
+
+```
+exe    1EBAF888BE2288E48614EE88C15EE5BB9A4FAD9C4669FE4FA2D223D2B2886408
+zip    11FB627C3E4E4E78E313281AADF897CFE76CEA75BA877026B36864CB84BD9C0E
+ist_dl A5986CA863787DC9EB29DBBBD98A4B096171F6561A5752C978A41564982CE63C
+```
 
 ### v2.11 打包记录（2026-11-03）
 

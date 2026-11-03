@@ -417,7 +417,7 @@ python tools\dng_season_params.py --target "sample/ist DL.dng" --builtin istdl ^
    与 v2.11 的参考 SHA 逐字节一致；*ist DL 从原来的 `no-donor` 变成有产物，
    是本次唯一预期的变化。
 4. readme 适配表加入第 16 行（A 档，共 21 台），版本说明补 v2.12；
-   GUI 版本号 2.12，窗口高度 1008 → 1042（`minsize` 1012），容纳第 8 个来源行。
+   GUI 版本号 2.12，窗口高度 978 → 1012（`minsize` 1120×1012），容纳第 8 个来源行。
 
 ## 9. 边界与未验证
 
