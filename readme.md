@@ -109,7 +109,8 @@ macOS 上要用 py2app 打包（`python3 setup.py py2app`），打包步骤与
   （max|Y−I| = 0.1625，是支持机型里最大的），相对风格与 KF 差 ≤6.1×10⁻⁵。
   PDCU 5.10.2.2 实测：四项列在 SATOBI 之后的 Gold 档与“波普风格”之间；把 #7–#10
   换成纯红后四项画面全变纯红、As Shot 逐像素不变，3008×2008 另存 JPEG 同样——
-  即四季确实由写入的矩阵控制。注意：PDCU 的风格列表有 35 项且上下键**会回绕**，
+  即四季确实由写入的矩阵控制（效果图
+  [`docs/PDCU-istDL-四季效果.png`](docs/PDCU-istDL-四季效果.png)）。注意：PDCU 的风格列表有 35 项且上下键**会回绕**，
   键盘选行必须用 `HOME`，不能连按 `UP` 回顶；上一份“\*ist DL 不可移植”的分析
   就是在这里选错了行，本次一并更正（详见
   [`docs/PDCU-istDL-KF四季移植分析.md`](docs/PDCU-istDL-KF四季移植分析.md)）。
