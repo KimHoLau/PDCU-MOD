@@ -44,17 +44,18 @@ PDCU 宾得相机DNG文件补齐四季色彩矩阵及曲线参数工具(春红HA
 | 13 | **PENTAX K20D** | A | KF×Y，Y 来自自身 0x021B；0x021A 重建为 12 参数，MakerNote 整块搬到文件尾 | 5.8×10⁻⁵ | PDCU 5.10.2.2 菜单实测（8 参数不列、12 参数列出，v2.8） |
 | 14 | **PENTAX K10D** | A | KF×Y，Y 来自自身 0x021B；0x021A 重建为 12 参数（5 参数表），两张表搬进私有块内空闲区 | 5.6×10⁻⁵ | PDCU 5.10.2.2 菜单 + 四项渲染 + marker + As Shot（v2.9） |
 | 15 | **PENTAX K-7** | A | KF×Y，Y 来自自身 0x021B；0x021A 重建为 12 参数（11 参数表），MakerNote 整块搬到文件尾 | 6.2×10⁻⁵ | PDCU 5.10.2.2 菜单 + 四项渲染 + marker + As Shot（v2.10） |
-| 16 | **PENTAX K-50** | B | ColorMatrix2 推算 Y | 5.7×10⁻⁵ | 九机同场景 + K-3 渲染对照 |
-| 17 | **PENTAX K-01** | B | ColorMatrix2 推算 Y | 5.5×10⁻⁵ | PDCU 渲染复核（舞狮），无同场景定量 |
-| 18 | **PENTAX K-30** | B | ColorMatrix2 推算 Y | 5.4×10⁻⁵ | PDCU 渲染复核（街景），无同场景定量 |
-| 19 | **PENTAX MX-1** | B | ColorMatrix2 推算 Y（1/1.7"） | 1.07×10⁻⁴ | PDCU 菜单 + 四季渲染 + 同场景比值 + As Shot 零变化（v2.3） |
-| 20 | **PENTAX Q7** | B | ColorMatrix2 推算 Y（小底） | 5.1×10⁻⁵ | 九机同场景，但 Y 不在单反校准线上 |
+| 16 | **PENTAX \*ist DL** | A | KF×Y，Y 来自自身 0x021B；0x021A 重建为 12 参数（5 参数 / 7 条），MakerNote 整块搬到文件尾 | 6.1×10⁻⁵ | PDCU 5.10.2.2 菜单 + 四项渲染 + marker + 全尺寸导出（v2.12） |
+| 17 | **PENTAX K-50** | B | ColorMatrix2 推算 Y | 5.7×10⁻⁵ | 九机同场景 + K-3 渲染对照 |
+| 18 | **PENTAX K-01** | B | ColorMatrix2 推算 Y | 5.5×10⁻⁵ | PDCU 渲染复核（舞狮），无同场景定量 |
+| 19 | **PENTAX K-30** | B | ColorMatrix2 推算 Y | 5.4×10⁻⁵ | PDCU 渲染复核（街景），无同场景定量 |
+| 20 | **PENTAX MX-1** | B | ColorMatrix2 推算 Y（1/1.7"） | 1.07×10⁻⁴ | PDCU 菜单 + 四季渲染 + 同场景比值 + As Shot 零变化（v2.3） |
+| 21 | **PENTAX Q7** | B | ColorMatrix2 推算 Y（小底） | 5.1×10⁻⁵ | 九机同场景，但 Y 不在单反校准线上 |
 
 > 表里的 max|ΔR| 是四季风格 R = M季节·inv(M基准) 与 KF 原生的最大差；Q13 一个 LSB
 > 是 1.22×10⁻⁴，所以**全部机型都在一个量化步长以内**。
 > S 档：原生或等价原生（4 台）
-> A 档：机身 0x021B 基准精确校准（11 台）
-这 11 台都有 `0x021B` 基准矩阵，工具运行时算 `Y = inv(M_KF[0])·M_body[0]`，
+> A 档：机身 0x021B 基准精确校准（12 台）
+这 12 台都有 `0x021B` 基准矩阵，工具运行时算 `Y = inv(M_KF[0])·M_body[0]`，
 再把 KF 四季矩阵乘上 Y。数学上就是 Pentax 生成各机身表的做法，所以是“精确解”。
 > B 档：ColorMatrix2 推算（5 台）
 这 5 台没有 `0x021A`/`0x021B`，Y 只能由 DNG 的 ColorMatrix2 反推：
@@ -100,6 +101,20 @@ macOS 上要用 py2app 打包（`python3 setup.py py2app`），打包步骤与
 > 发布物命名沿用旧名 `PDCU-Season-Params`（exe / zip / InternalName /
 > OriginalFilename），产品名与文件属性中的 FileDescription / ProductName
 > 仍是 **PDCU MOD**；这是兼容既有发布与脚本的例外，详见「运行」。
+- **v2.12**：新增 **PENTAX \*ist DL**（内置 \*ist DL）。2005 年的 6 MP 机身，AOC
+  MakerNote（`0x927C`，绝对偏移）只有 12,408 B 且**完全紧排**：`0x021A` 是
+  5 参数 / 12 字节 / 7 条、`0x021B` 7 个矩阵。工具重建为 12 参数 / 26 字节并补四条
+  季节记录，整块搬到文件尾：文件 +12,925 B，原文件只改 5 B，raw / 全尺寸 JPEG /
+  缩略图逐字节未动。四季矩阵 = KF 四季矩阵 × `Y = inv(M_KF[0])·M_istDL[0]`
+  （max|Y−I| = 0.1625，是支持机型里最大的），相对风格与 KF 差 ≤6.1×10⁻⁵。
+  PDCU 5.10.2.2 实测：四项列在 SATOBI 之后的 Gold 档与“波普风格”之间；把 #7–#10
+  换成纯红后四项画面全变纯红、As Shot 逐像素不变，3008×2008 另存 JPEG 同样——
+  即四季确实由写入的矩阵控制。注意：PDCU 的风格列表有 35 项且上下键**会回绕**，
+  键盘选行必须用 `HOME`，不能连按 `UP` 回顶；上一份“\*ist DL 不可移植”的分析
+  就是在这里选错了行，本次一并更正（详见
+  [`docs/PDCU-istDL-KF四季移植分析.md`](docs/PDCU-istDL-KF四季移植分析.md)）。
+  界面：窗口高度 1008 → 1042（`minsize` 1120×1012），容纳第 8 个来源选项；
+  版本号同步到 2.12。
 - **v2.11**：修复 **DCU 5 转出的 DNG 打补丁后 PDCU 不出图**。把 AOC MakerNote
   整块搬到文件尾时，工具把 `0x0004` / `0x0005` 当成"预览偏移"，只要数值落在块内就
   整体加位移；这两个标签其实是 **Pentax 机型 ID**（K-1 Mark II = `0x13240`），被改掉

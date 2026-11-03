@@ -55,6 +55,12 @@ inside the block and the file does not grow.  --builtin k10d carries the
 K10D-calibrated season matrices (its ColorMatrix2 disagrees with 0x021B; PDCU
 reads 0x021B only).
 
+PENTAX *ist DL (2005) is the oldest supported body: a packed 12,408-byte AOC
+MakerNote with seven 5-parameter / 12-byte mode records and seven matrices,
+and no gap at all, so the rebuilt tables force the whole block to the end of
+the file (like the K20D / K-7).  --builtin istdl carries the *ist DL
+calibrated season matrices (Y = 0.1625, the largest of the supported bodies).
+
 PENTAX K-7 (2009) writes the same AOC EXIF MakerNote as the K20D, but with 11
 parameters per record (24 bytes), 22 mode records and 17 matrices.  Its 34 KB
 block is packed (largest gap 1 B), so the 12-parameter / 26-byte rebuild and
@@ -99,6 +105,7 @@ import dng_report
 import season_645d_data
 import season_k01_data
 import season_k10d_data
+import season_istdl_data
 import season_k1_data
 import season_k1ii_data
 import season_k20d_data
@@ -144,6 +151,7 @@ MODEL_TO_DONOR_KIND = {
     "PENTAX K20D": "k20d",
     "PENTAX K-7": "k7",
     "PENTAX K10D": "k10d",
+    "PENTAX *ist DL": "istdl",
     "PENTAX K-30": "k30",
     "PENTAX K-01": "k01",
     "PENTAX K-50": "k50",
@@ -195,6 +203,9 @@ BUILTIN_SOURCES = {
     "builtin_k7": BuiltinSource(
         "builtin_k7", "内置 K-7", ("k7",),
         "季节来源：内置 K-7 四季参数"),
+    "builtin_istdl": BuiltinSource(
+        "builtin_istdl", "内置 *ist DL", ("istdl",),
+        "季节来源：内置 *ist DL 四季参数"),
 }
 BUILTIN_SOURCE_MODELS = {
     source.key: frozenset(
@@ -216,6 +227,7 @@ AUTO_SELECT_GROUPS = (
     ("builtin_k20d", frozenset(("PENTAX K20D",))),
     ("builtin_k10d", frozenset(("PENTAX K10D",))),
     ("builtin_k7", frozenset(("PENTAX K-7",))),
+    ("builtin_istdl", frozenset(("PENTAX *ist DL",))),
     ("builtin_kf", frozenset(("PENTAX K-3", "PENTAX K-3 II", "PENTAX K-5 II",
                               "PENTAX K-5 II s", "PENTAX 645Z", "PENTAX KP",
                               "PENTAX K-S2"))),
@@ -236,6 +248,7 @@ SELFTEST_DONOR_FLAGS = {
     "--selftest-k20d": "k20d",
     "--selftest-k10d": "k10d",
     "--selftest-k7": "k7",
+    "--selftest-istdl": "istdl",
 }
 SELFTEST_FLAGS = tuple(SELFTEST_DONOR_FLAGS) + ("--selftest-cross",)
 
@@ -1217,6 +1230,7 @@ _BUILTIN_DATA_MODULES = {
     "k20d": season_k20d_data,
     "k10d": season_k10d_data,
     "k7": season_k7_data,
+    "istdl": season_istdl_data,
 }
 BUILTIN_DONOR_KINDS = tuple(_BUILTIN_DATA_MODULES)
 
@@ -2066,7 +2080,8 @@ def main(argv=None):
                         "0x021A/0x021B table; 645d for the 11-parameter "
                         "record layout; k20d for the 8-parameter table; "
                         "k10d for the 5-parameter table; k7 for the "
-                        "11-parameter K-7 table)")
+                        "11-parameter K-7 table; istdl for the oldest "
+                        "5-parameter / 7-record *ist DL table)")
     p.add_argument("--out", help="output DNG path")
     p.add_argument("--in-place", action="store_true", help="modify the target file")
     p.add_argument("--no-backup", action="store_true",
