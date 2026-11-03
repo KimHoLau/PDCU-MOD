@@ -1417,20 +1417,44 @@ def build_new_table(target, donor, missing, xform=None):
     return header + b"".join(r["bytes"] for r in new_records), nrec, added, info
 
 def _preview_offsets(dng):
-    """The 0x0004/0x0005 preview offsets, which are tag *data* (absolute)."""
+    """0x0004/0x0005 values that really do point at an embedded JPEG.
+
+    0x0005 is the Pentax model id (a per-body constant such as 0x13240 for the
+    K-1 Mark II), and 0x0004 is a second model/version id; neither is an
+    offset.  On a big file they can still land inside the private block by
+    coincidence (K-1 Mark II DNG written by DCU: 0x13240 sits inside the
+    0x927C block), so rebasing every value that falls inside the block range
+    silently turns the camera id into garbage and PDCU then refuses to develop
+    the image.  Only a value whose target starts with a JPEG SOI is a preview
+    pointer that has to follow the block.
+    """
     values = {}
     for tag in (0x0004, 0x0005):
         entry = dng.priv_entries.get(tag)
-        if entry is not None and entry["size"] == 4:
-            values[tag] = _u32(dng.data, entry["value_off"], dng.priv_endian)
+        if entry is None or entry["size"] != 4:
+            continue
+        value = _u32(dng.data, entry["value_off"], dng.priv_endian)
+        start = value if dng.priv_abs else dng.priv_off + value
+        if not (dng.priv_off <= start < dng.priv_end):
+            continue
+        if bytes(dng.data[start:start + 2]) != b"\xff\xd8":
+            continue
+        values[tag] = value
     return values
 
 
-def _private_tag_digest(dng):
-    """Fingerprint the private tags a maker-note move must not alter."""
+def _private_tag_digest(dng, skip=()):
+    """Fingerprint the private tags a maker-note move must not alter.
+
+    Only 0x021A/0x021B (rewritten on purpose) and the tags the plan really
+    relocates (skip) are left out, so a move that corrupts any other value -
+    the model id in 0x0005 above all - fails verification instead of shipping.
+    """
+    ignored = {0x021A, 0x021B}
+    ignored.update(skip)
     digest = {}
     for tag, entry in dng.priv_entries.items():
-        if tag in (0x021A, 0x021B, 0x0004, 0x0005):
+        if tag in ignored:
             continue
         if entry["inline"]:
             raw = bytes(dng.data[entry["entry_off"] + 8:entry["entry_off"] + 12])
@@ -1477,8 +1501,6 @@ def plan_rebuild_makernote(target, new_table, new_matrix_table, added, nrec,
 
     relocated_preview = {}
     for tag, value in _preview_offsets(target).items():
-        if not (target.priv_off <= value < target.priv_end):
-            continue
         entry = target.priv_entries[tag]
         struct.pack_into(target.priv_endian + "I", block,
                          entry["value_off"] - target.priv_off, value + delta)
@@ -1528,7 +1550,8 @@ def plan_rebuild_makernote(target, new_table, new_matrix_table, added, nrec,
         "new_block_len": len(block),
         "block_growth": len(block) - target.priv_len,
         "file_growth": new_off + len(block) - len(target.data),
-        "priv_digest": _private_tag_digest(target),
+        "priv_digest": _private_tag_digest(target,
+                                            skip=tuple(relocated_preview)),
         "relocated_preview": relocated_preview,
     }
     plan.update(info)
@@ -1785,6 +1808,10 @@ def _verify_rebuilt_makernote(check, plan):
         if got != value:
             raise DngError("verification failed: preview tag 0x%04X offset "
                            "0x%X != 0x%X" % (tag, got, value))
+        if bytes(check.data[value:value + 2]) != b"\xff\xd8":
+            raise DngError(
+                "verification failed: preview tag 0x%04X was rebased to 0x%X, "
+                "which is not a JPEG" % (tag, value))
 
 
 def verify_output(out_path, plan):

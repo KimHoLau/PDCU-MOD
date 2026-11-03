@@ -32,7 +32,7 @@ PDCU 宾得相机DNG文件补齐四季色彩矩阵及曲线参数工具(春红HA
 | 1 | **PENTAX KF** | S | 机内原生四季表（本项目基准） | 0 | donor 本体 |
 | 2 | **PENTAX K-70** | S | 内置 KF 表；21 个基础矩阵与 KF 逐字节相同，Y=I | 0 | 九机同场景 |
 | 3 | **PENTAX K-1** | S | 机内原生 K-1 四季表 | 7.3×10⁻⁵ | 九机同场景 |
-| 4 | **PENTAX K-1 Mark II** | S | 内置 K-1 原生四季表；28 条记录 / 21 个基础矩阵与 K-1 逐字节相同，Y=I | 7.3×10⁻⁵ | PDCU 菜单 + As Shot 零变化 + 同场景比值（v2.4） |
+| 4 | **PENTAX K-1 Mark II** | S | 内置 K-1 原生四季表；28 条记录 / 21 个基础矩阵与 K-1 逐字节相同，Y=I | 7.3×10⁻⁵ | PDCU 菜单 + As Shot 零变化 + 同场景比值（v2.4）；DCU 转出 DNG 实测（v2.11） |
 | 5 | **PENTAX K-3** | A | KF×Y，Y 来自自身 0x021B | 5.7×10⁻⁵ | 九机同场景，CM2 pass |
 | 6 | **PENTAX K-3 II** | A | 同 K-3 的 Y | 5.7×10⁻⁵ | 九机同场景 |
 | 7 | **PENTAX K-5 II** | A | 基准与 K-3 逐字节相同，同一张表 | 6.0×10⁻⁵ | 矩阵/画面 ΔE；未 PDCU 实测 |
@@ -82,7 +82,7 @@ PDCU 宾得相机DNG文件补齐四季色彩矩阵及曲线参数工具(春红HA
 
 ## 运行
 
-发布文件：`dist/PDCU-Season-Params.exe`（或 `dist/PDCU-Season-ParamsV2.10.zip`）
+发布文件：`dist/PDCU-Season-Params.exe`（或 `dist/PDCU-Season-ParamsV2.11.zip`）
 
 双击运行，首次运行 Windows SmartScreen 可能提示
 “未知发布者”，选择“更多信息 -> 仍要运行”。
@@ -100,6 +100,17 @@ macOS 上要用 py2app 打包（`python3 setup.py py2app`），打包步骤与
 > 发布物命名沿用旧名 `PDCU-Season-Params`（exe / zip / InternalName /
 > OriginalFilename），产品名与文件属性中的 FileDescription / ProductName
 > 仍是 **PDCU MOD**；这是兼容既有发布与脚本的例外，详见「运行」。
+- **v2.11**：修复 **DCU 5 转出的 DNG 打补丁后 PDCU 不出图**。把 AOC MakerNote
+  整块搬到文件尾时，工具把 `0x0004` / `0x0005` 当成"预览偏移"，只要数值落在块内就
+  整体加位移；这两个标签其实是 **Pentax 机型 ID**（K-1 Mark II = `0x13240`），被改掉
+  之后 PDCU 认不出机型——标签页打得开、相机信息也正常，但画面永远停在灰底。K-7
+  （`0x12DB8`）/ K20D（`0x12CD2`）/ *ist DL（`0x12B1A`）的机型 ID 都在块外，所以
+  v2.8–v2.10 一直没暴露；K-1 Mark II 由 PEF 转出的 DNG 块有 77,072 B，才第一次撞上。
+  现在只有目标字节以 `FF D8` 开头才认定是预览偏移，并把 `0x0004` / `0x0005` 纳入
+  搬块后的逐字节校验（旧的错误重定位会被 `verify_output()` 直接拒绝）。修复后该文件在
+  PDCU 5.10.2.2 正常显影、四季四项齐全，As Shot 与补丁前逐像素相同；**17 个既有样本的
+  输出逐字节未变**。详见
+  [`docs/PDCU-DCU转换DNG-机型ID误重定位.md`](docs/PDCU-DCU转换DNG-机型ID误重定位.md)。
 - **v2.10**：新增 **PENTAX K-7**（内置 K-7）。K-7 的 AOC MakerNote 与 K20D
   同型（EXIF `0x927C` + 绝对偏移），但 `0x021A` 是 **11 参数 / 24 字节 /
   22 条记录 / 17 个矩阵**，34,002 B 的块已排满（最大空隙 1 B）。工具把整张表
@@ -212,6 +223,41 @@ macOS 上要用 py2app 打包（`python3 setup.py py2app`），打包步骤与
   并用 K-30 色彩空间校准 KF 四季矩阵。K-30 自动识别。
 - **v1.5**：内置 KF 四季参数，K-70 自动识别。
 - **v1.4**：内置 KF 数据；KF / K-70 按“基础矩阵相同”精确移植。
+
+### v2.11 打包记录（2026-11-03）
+
+构建：Python 3.14.3 + PyInstaller 6.22.3，`PDCU-Season-Params.spec`（onefile；
+构建机未检测到 UPX，与 v2.10 相同），FileVersion / ProductVersion **2.11.0.0**。
+
+| 产物 | 大小 |
+|---|---:|
+| `dist/PDCU-Season-Params.exe` | 19,391,300 B |
+| `dist/PDCU-Season-ParamsV2.11.zip`（exe + 使用说明） | 19,136,906 B |
+
+打包后 exe 的 **18 组**机型自检全部通过：前 17 组与 v2.10 记录逐字节相同（新增的
+0x0005 校验只影响"块内排满必须搬家"的文件，既有 17 台都不在其中），第 18 组是
+v2.11 修的那份 **DCU 转出的 K-1 Mark II DNG**，输出与源码版 CLI / GUI 逐字节相同：
+
+| 机型 | 自检参数 | 自检输出 SHA-256 |
+|---|---|---|
+| K-1 Mark II（DCU 转出） | `--selftest-k1ii sample\wrong\K1ii.dng` | `230264917ED7BBC49D83E437B004ACE37BCC5800D01E9C709B3387DA8EA41259` |
+
+其余 17 组（K-1 / K-1 Mark II / K-70 / K-3 / K-3 II / KP / K-S2 / 645Z / 645D /
+K-30 / K-01 / K-50 / Q7 / MX-1 / K20D / K10D / K-7）与 v2.10 的 SHA-256 记录逐字节
+相同，见上一节表格。
+
+界面：源码与 exe 的标题栏、右上角 chip 都是 v2.11，7 个来源选项完整显示；
+`PDCU-GUI.png` 已按 v2.11 更新。
+
+zip 内文件：`PDCU-Season-Params.exe` + `使用说明.txt`（首行 PDCU MOD v2.11）。
+
+SHA-256：
+
+```
+exe    D43CEF6DD1E20CCFA6E5688CBF5FF980F3AAF86E26A152D8D46F6B51D4D29747
+zip    60ECAC9B4E96175082F717437D00855646445E75AC481DB971BB90BE136A30A2
+K1ii_dcu 230264917ED7BBC49D83E437B004ACE37BCC5800D01E9C709B3387DA8EA41259
+```
 
 ### v2.10 打包记录（2026-11-02）
 
