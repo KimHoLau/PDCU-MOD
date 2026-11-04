@@ -29,6 +29,23 @@ def describe_cm2(cal):
             % cm2["delta"])
 
 
+def describe_baked(baked):
+    """Verdict for a bundled table that was calibrated offline."""
+    if not baked:
+        return ""
+    if baked["ok"]:
+        return ("pass - bundled matrices equal %s-style * Y recomputed from "
+                "this file's ColorMatrix2 (dY %.1e, dBase %.1e, dCM2 %.1e)"
+                % (baked["source"].upper(), baked["matrix_delta"] or 0.0,
+                   baked["base_delta"] or 0.0, baked["cm2_delta"] or 0.0))
+    return ("WARNING - the bundled table no longer matches this file "
+            "(matrices dY %.1e, base dBase %.1e, ColorMatrix2 dCM2 %.1e); "
+            "the season colours are off by that amount. Re-check the model / "
+            "firmware, or rebuild the bundle from this sample."
+            % (baked["matrix_delta"] or 0.0, baked["base_delta"] or 0.0,
+               baked["cm2_delta"] or 0.0))
+
+
 def describe_calibration(cal):
     """One-line summary used by the CLI and the GUI log."""
     if cal is None:
@@ -133,7 +150,7 @@ def dry_run_report():
 
 
 def calibration_report(target, donor, compatible_cross, calibrated_cross,
-                       calibration):
+                       calibration, baked=None):
     lines = []
     if target.model and donor.model and target.model != donor.model:
         msg = ("camera model mismatch: target %r, donor %r"
@@ -158,13 +175,24 @@ def calibration_report(target, donor, compatible_cross, calibrated_cross,
                          % (target.unique_model, donor.unique_model))
 
     lines.append("== calibration ==")
-    lines.append("target base    : %s"
-                 % ("" if calibration is None
-                    else matrix_text(calibration["target_base"])))
-    lines.append("donor base     : %s"
-                 % ("" if calibration is None
-                    else matrix_text(calibration["donor_base"])))
-    lines.append("result         : %s" % describe_calibration(calibration))
+    if calibration is None and baked is not None:
+        lines.append("target base    : (none - this body writes no 0x021B)")
+        donor_base = (matrix_text(baked["donor_base"])
+                      if baked.get("donor_base") else "?")
+        lines.append("donor base     : %s  (implied base of the bundle)"
+                     % donor_base)
+        lines.append("result         : pre-calibrated offline: "
+                     "Y = T(%s) * inv(T(target)), baked into the bundled "
+                     "matrices" % baked["source"].upper())
+        lines.append("recompute      : %s" % describe_baked(baked))
+    else:
+        lines.append("target base    : %s"
+                     % ("" if calibration is None
+                        else matrix_text(calibration["target_base"])))
+        lines.append("donor base     : %s"
+                     % ("" if calibration is None
+                        else matrix_text(calibration["donor_base"])))
+        lines.append("result         : %s" % describe_calibration(calibration))
     if calibration is not None and calibration["style_ok"]:
         lines.append("style check    : pass (%d common modes, median %.1e)"
                      % (calibration["modes"], calibration["style_median"]))

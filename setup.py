@@ -36,8 +36,8 @@ OPTIONS = {
     "plist": {
         "CFBundleName": "PDCU MOD",
         "CFBundleDisplayName": "PDCU MOD",
-        "CFBundleShortVersionString": "2.12",
-        "CFBundleVersion": "2.12.0",
+        "CFBundleShortVersionString": "2.13",
+        "CFBundleVersion": "2.13.0",
         "LSMinimumSystemVersion": "10.13",
         "NSHighResolutionCapable": True,
         # 自绘深色界面：固定 Aqua 观感，避免 10.14+ 深色模式下 Tk 控件变色。

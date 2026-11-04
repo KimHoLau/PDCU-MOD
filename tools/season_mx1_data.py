@@ -29,11 +29,15 @@ PRIV_ENDIAN = '<'
 # as a donor.  The MX-1 itself has no 0x021B table to compare it against.
 BASE_MATRIX = (12993, -4641, -160, -2624, 12738, -1921, 384, -4289, 12096)
 
-# MX-1 ColorMatrix2 (DNG 0xC622, 3x3 floats).  Only used by the tool's
-# base-vs-CM2 sanity check, and it is the source of the calibration above.
-CM2 = (0.880447, -0.252304, -0.123764,
-       -0.242310, 1.162735, 0.085953,
-       -0.068161, 0.177353, 0.475311)
+# MX-1 ColorMatrix2 (DNG 0xC622, 3x3 floats, full precision).  Only used by
+# the tool's offline-calibration check, and it is the source of the
+# calibration above.
+CM2 = (0.8804473876953125, -0.2523040771484375, -0.1237640380859375,
+       -0.2423095703125, 1.1627349853515625, 0.0859527587890625,
+       -0.0681610107421875, 0.1773529052734375, 0.475311279296875)
+
+# Style table the four season matrices were derived from.
+CALIBRATED_FROM = 'kf'
 
 # KF season records in the MX-1 byte order, with param 128 (the 0x021B
 # matrix index) renumbered to this bundle's 0..3.

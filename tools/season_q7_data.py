@@ -5,12 +5,27 @@ block little-endian.  Its ColorMatrix2 differs a lot from the SLR
 bodies, so the KF season style is calibrated through
 Y = T(KF) * inv(T(Q7)), T = diag(1/(CM2*W)) * CM2.  This is the same
 construction used for the K-01; it is an inference, not official
-Pentax season data for the Q7."""
+Pentax season data for the Q7.
+
+CM2 keeps that calibration input and CALIBRATED_FROM names the style table
+these matrices were derived from, so dng_season_params.baked_calibration()
+can prove at run time that the bundle still equals KF-style * Y for the file
+being patched.
+"""
 
 __copyright__ = "Copyright © 2026 KimHoLau X deepseek harness"
 
 from season_common import (BLOCK_SIZE, N_PARAMS, Q7_MX1_RECORDS, REC_SIZE,
                            TABLE_PARAMS)
+
+# DNG ColorMatrix2 (0xC622) of the Q7 sample these seasons were calibrated
+# on.  Only used by the offline-calibration check, never written to a file.
+CM2 = (1.299453735352, -0.559326171875, -0.110717773438,
+       -0.187881469727, 1.013946533203, 0.202682495117,
+       -0.006423950195, 0.123291015625, 0.491882324219)
+
+# Style table the four season matrices were derived from.
+CALIBRATED_FROM = 'kf'
 
 MODEL = 'PENTAX Q7'
 UNIQUE_MODEL = 'PENTAX Q7'

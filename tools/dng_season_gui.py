@@ -35,7 +35,7 @@ except Exception:  # Pillow is optional in a source checkout.
 import dng_season_params as core
 
 APP_TITLE = "PDCU MOD"
-APP_VERSION = "2.12"
+APP_VERSION = "2.13"
 APP_INTRO = ("PDCU 宾得相机DNG文件补齐四季色彩矩阵及曲线参数工具"
              "(春红HARUBENI、夏至KATEN、九秋KYUSHU、冬日FUYUNO)")
 COPYRIGHT = "版权所有 © 2026 KimHoLau X deepseek harness"
@@ -1944,6 +1944,12 @@ class App(tk.Tk):
                         self.queue.put((
                             "log", "  按目标机身校准：%s"
                             % core.describe_calibration(res.get("calibration"))))
+                    elif not res.get("calibration"):
+                        baked = core.baked_calibration(target, donor)
+                        if baked:
+                            self.queue.put((
+                                "log", "  离线校准自检：%s"
+                                % core.describe_baked(baked)))
                     cm2_text = core.describe_cm2(res.get("calibration"))
                     if cm2_text:
                         self.queue.put(("log", "  %s" % cm2_text))

@@ -83,7 +83,7 @@ PDCU 宾得相机DNG文件补齐四季色彩矩阵及曲线参数工具(春红HA
 
 ## 运行
 
-发布文件：`dist/PDCU-Season-Params.exe`（或 `dist/PDCU-Season-ParamsV2.12.zip`）
+发布文件：`dist/PDCU-Season-Params.exe`（或 `dist/PDCU-Season-ParamsV2.13.zip`）
 
 双击运行，首次运行 Windows SmartScreen 可能提示
 “未知发布者”，选择“更多信息 -> 仍要运行”。
@@ -101,6 +101,20 @@ macOS 上要用 py2app 打包（`python3 setup.py py2app`），打包步骤与
 > 发布物命名沿用旧名 `PDCU-Season-Params`（exe / zip / InternalName /
 > OriginalFilename），产品名与文件属性中的 FileDescription / ProductName
 > 仍是 **PDCU MOD**；这是兼容既有发布与脚本的例外，详见「运行」。
+- **v2.13**：给五台**没有机内 `0x021B`** 的机身（K-30 / K-01 / K-50 / Q7 / MX-1）
+  加**离线校准自检**。这五台的四季矩阵是按各自 ColorMatrix2 离线算好的冻结表；工具
+  现在会在转换时用**文件自己的** ColorMatrix2 重算 `Y = T(KF)·inv(T(target))`，核对内置的
+  4 个矩阵（量化后 0 LSB）与隐含基准（1.8–5.9×10⁻⁵）：CLI 打印 `recompute : pass …`，
+  GUI 日志同步一行“离线校准自检：pass …”。对不上（固件或样本变了）会打印 WARNING，
+  并给出矩阵、基准与 ColorMatrix2 三个差值。数据模块新增 `CM2` 与
+  `CALIBRATED_FROM='kf'` 声明；`tests/test_season_data.py` 从 1 台扩到 5 台、6 组用例
+  （含“改 1% ColorMatrix2 必须报警”的防退化用例）。顺带修正 K-50 数据模块里一处过期
+  数值（1.4e-5 → 3.65e-5）。PDCU 5.10.2.2 实测：五台的 marker（纯 R/G/B/单位阵）
+  全部逐项对应；K-50 的“隐含基准 vs As Shot”跨机身差分 0.27%，Q7 0.67%、MX-1 0.63%。
+  **输出字节未变**（18 组自检与 v2.12 记录逐字节相同）。详见
+  [`docs/PDCU-K50-四季方案优化分析.md`](docs/PDCU-K50-四季方案优化分析.md)、
+  [`docs/PDCU-K30-K01-四季自检.md`](docs/PDCU-K30-K01-四季自检.md)、
+  [`docs/PDCU-Q7-MX1-四季自检.md`](docs/PDCU-Q7-MX1-四季自检.md)。版本号同步到 2.13。
 - **v2.12**：新增 **PENTAX \*ist DL**（内置 \*ist DL）。2005 年的 6 MP 机身，AOC
   MakerNote（`0x927C`，绝对偏移）只有 12,408 B 且**完全紧排**：`0x021A` 是
   5 参数 / 12 字节 / 7 条、`0x021B` 7 个矩阵。工具重建为 12 参数 / 26 字节并补四条
@@ -239,6 +253,39 @@ macOS 上要用 py2app 打包（`python3 setup.py py2app`），打包步骤与
   并用 K-30 色彩空间校准 KF 四季矩阵。K-30 自动识别。
 - **v1.5**：内置 KF 四季参数，K-70 自动识别。
 - **v1.4**：内置 KF 数据；KF / K-70 按“基础矩阵相同”精确移植。
+
+### v2.13 打包记录（2026-11-04）
+
+构建：Python 3.14.3 + PyInstaller 6.22.3，`PDCU-Season-Params.spec`（onefile），
+FileVersion / ProductVersion **2.13.0.0**。
+
+| 产物 | 大小 |
+|---|---:|
+| `dist/PDCU-Season-Params.exe` | 19,395,675 B |
+| `dist/PDCU-Season-ParamsV2.13.zip`（exe + 使用说明） | 19,142,313 B |
+
+打包后 exe 的机型自检 **18/18 通过**，输出 DNG 与 v2.12 记录逐字节相同（K-1 /
+K-1 Mark II / K-70 / K-3 / K-3 II / KP / K-S2 / 645Z / 645D / K-30 / K-01 / K-50 /
+Q7 / MX-1 / K20D / K10D / K-7 / *ist DL）。v2.12 记录里的第 19 组（DCU 5 转出的
+K-1 II，`sample/wrong/K1ii.dng`）**样本不在当前工作区**，本次未复跑；那次修复的
+代码路径（机型 ID 0x0004/0x0005 的预览偏移判定）本次未改动，v2.12 的结论继续有效。
+
+本次新增的行为只在日志侧：五台无表机身的转换日志会多一行
+“离线校准自检：pass …”，EXIF / 0x021A / 0x021B / raw / 预览均未变——18 组自检的
+输出 SHA-256 与 v2.12 逐一相同可以证明这一点。
+
+界面：exe 窗口标题 `PDCU MOD v2.13`，版本资源 2.13.0.0；布局与 v2.12 相同
+（本次只加了一行日志）；`PDCU-GUI.png` 已按 v2.13 更新（标题栏与 chip 都是 v2.13，
+8 个来源选项完整显示，窗口 1216×1051）。
+
+zip 内文件：`PDCU-Season-Params.exe` + `使用说明.txt`（首行 PDCU MOD v2.13，正文已补 v2.13 的离线校准自检说明）。
+
+SHA-256：
+
+```
+exe    CF3855357ECF8FA593B63534DED25B50AA405885F27EF0302728672625CC094F
+zip    ABC874B7BE5FE6952AAEE4617FF190905A6255D0B3CD5F90824589B096BEF1AB
+```
 
 ### v2.12 打包记录（2026-11-03）
 
@@ -766,9 +813,14 @@ K10D 使用 `k10d` 数据，K-7 使用 `k7` 数据。
   （`sample/K30.DNG`），Y 与 K-3 只差 2.2×10⁻⁵，写出的矩阵与 K-3 精确解
   只差 1 个 Q13 LSB。结构上四季菜单和渲染都可用，但这是本工具的最佳推算，
   不是官方 K-30 固件数据。
+  工具会用文件自己的 ColorMatrix2 重算 Y 并核对内置表（矩阵差 0 LSB、隐含
+  基准 4.2×10⁻⁵），CLI / GUI 打印“离线校准自检：pass …”；marker 与隐含基准
+  实测见 [`docs/PDCU-K30-K01-四季自检.md`](docs/PDCU-K30-K01-四季自检.md)。
 - K-01 与 K-30 同代同像素，真实 K-01 的 ColorMatrix2 与 K-30 只有极小差异；
   工具为 K-01 单独内置了校准数据。`sample/K01.DNG` 是真实 K-01 文件，
   v1.7 已在 PDCU 中实测识别为 PENTAX K-01 并列出四季。
+  K-01 与 K-30 共用同一套离线校准自检（矩阵差 0 LSB、隐含基准 1.8×10⁻⁵），
+  说明见同一篇 [`docs/PDCU-K30-K01-四季自检.md`](docs/PDCU-K30-K01-四季自检.md)。
 - 645D 有 0x021A / 0x021B，但记录是 **11 参数 / 24 字节**（PDCU 只认 12 参数 /
   26 字节）。工具会把整张表重建成 12 参数：原有 24 条记录逐字段保留，只补一个
   `0xFFFF` 的参数 10 槽；实测 `0xFFFF` 与 `0` 渲染逐像素相同。645D 只缺 10 号
@@ -820,15 +872,28 @@ K10D 使用 `k10d` 数据，K-7 使用 `k7` 数据。
   以 K-70 为基准的同场景复核（矩阵残差 < 半个 LSB、与精确校准的 K-3
   渲染差 ≤0.67%、As Shot 逐像素不变）见
   [`docs/PDCU-K50-K70四季对比.md`](docs/PDCU-K50-K70四季对比.md)。
+  “能不能照 K-70 那样直接搬 KF 矩阵 / 换别的机身基准”的量化结论（照搬会偏
+  ΔE00 平均 0.61、最大 3.49；换成 K-1/KP/645Z 的基准为 0.45–1.20）见
+  [`docs/PDCU-K50-四季方案优化分析.md`](docs/PDCU-K50-四季方案优化分析.md)。
+  工具会拿文件自己的 ColorMatrix2 重算 Y 并核对内置表（当前矩阵差 0 LSB、
+  隐含基准差 5.8×10⁻⁵），CLI / GUI 日志打印“离线校准自检：pass …”；
+  对照表与 marker 实测见该文档 §12。
 - Q7 没有机内四季，1/1.7" 小底与单反色彩空间差得远，v2.0 用 Q7 自己的
   ColorMatrix2 校准。结构上四季菜单和渲染都可用，但这是**最佳推算**，
   不是官方 Q7 固件数据。
+  工具会用文件自己的 ColorMatrix2 重算 Y 并核对内置表（矩阵差 0 LSB、隐含
+  基准 5.9×10⁻⁵），CLI / GUI 打印“离线校准自检：pass …”；marker 与 K-3
+  的隐含基准差分（0.67%）见
+  [`docs/PDCU-Q7-MX1-四季自检.md`](docs/PDCU-Q7-MX1-四季自检.md)。
 - MX-1 是 v2.3 新增：没有机内四季，私有块只有 51,458 B，工具只搬 `0x0222`；
   用 MX-1 自己的 ColorMatrix2 校准。PDCU 实测识别为 PENTAX MX-1，四项都能
   列出并渲染；补丁前后 As Shot 逐像素相同，四季/As Shot 比值与九机均值一致
   （色向偏差 ≤1.67%）。它的 Y 与 K-3 差 1.04×10⁻¹，仍是**最佳推算**，
   不是官方 MX-1 固件数据。详见
   [`docs/PDCU-MX1-KF四季移植.md`](docs/PDCU-MX1-KF四季移植.md)。
+  MX-1 与 Q7 共用同一套离线校准自检（矩阵差 0 LSB、隐含基准 5.7×10⁻⁵），
+  marker 与 K-3 差分（0.63%）见
+  [`docs/PDCU-Q7-MX1-四季自检.md`](docs/PDCU-Q7-MX1-四季自检.md)。
 - 九台机身的同场景实测、四季效果图和全部数值见
   [`docs/PDCU-九机型四季实测.md`](docs/PDCU-九机型四季实测.md)，
   九机总览图 [`docs/PDCU-九机型四季总览.png`](docs/PDCU-九机型四季总览.png)。

@@ -532,6 +532,98 @@ def plan_calibration(target, donor):
     }
 
 
+def _module_cm2(module):
+    """DNG ColorMatrix2 declared by a bundled data module, or None."""
+    cm2 = getattr(module, "CM2", None)
+    return _mat_rows(cm2) if cm2 else None
+
+
+def baked_calibration(target, donor):
+    """Re-check a bundled table that was calibrated offline.
+
+    Bodies without 0x021A/0x021B (K-30 / K-01 / K-50 / Q7 / MX-1) have no
+    target base matrix, so plan_calibration() cannot calibrate them at run
+    time: their data modules ship matrices that already carry
+    Y = T(source style) * inv(T(body)) from the sample they were built on.
+    Such a module declares that sample's ColorMatrix2 (CM2) and the style
+    table it came from (CALIBRATED_FROM).
+
+    This rebuilds Y from the ColorMatrix2 of the file being patched and checks
+    that the bundled season matrices and its implied base matrix still match.
+    A mismatch means the file or the bundle moved apart (different firmware,
+    different sample, KF table updated), and the season colours are off by
+    exactly that amount.
+
+    target may be a Dng or a path.  Returns None when the donor is not an
+    offline-calibrated bundle, the target already has its own 0x021B, or the
+    data needed for the check is missing.
+    """
+    source_kind = getattr(donor, "baked_from", None)
+    if not source_kind:
+        return None
+    if isinstance(target, str):
+        target = Dng(target)
+    if target.has_matrix_table:
+        return None
+    target_cm2 = _holder_cm2(target)
+    source = _BUILTIN_DATA_MODULES.get(source_kind)
+    if target_cm2 is None or source is None:
+        return None
+    source_cm2 = _module_cm2(source)
+    if source_cm2 is None:
+        return None
+    src = builtin_donor(source_kind)
+    src_base = _base_matrix(src)
+    t_cm2 = _cm2_transform(target_cm2)
+    s_cm2 = _cm2_transform(source_cm2)
+    if src_base is None or t_cm2 is None or s_cm2 is None:
+        return None
+
+    y = _mat_mul(s_cm2, _mat_inv(t_cm2))
+    implied_base = _mat_mul(src_base, y)
+
+    deltas = []
+    for rid in SEASON_IDS:
+        src_rec = src.record(rid)
+        dst_rec = donor.record(rid)
+        if src_rec is None or dst_rec is None:
+            continue
+        src_idx = src.record_block_index(src_rec)
+        dst_idx = donor.record_block_index(dst_rec)
+        if not (0 <= src_idx < len(src.blocks)
+                and 0 <= dst_idx < len(donor.blocks)):
+            continue
+        want = _mat_encode(
+            _mat_mul(_mat_decode(src.blocks[src_idx], src.priv_endian), y),
+            donor.priv_endian)
+        deltas.append(_mat_maxdiff(
+            _mat_decode(want, donor.priv_endian),
+            _mat_decode(donor.blocks[dst_idx], donor.priv_endian)))
+
+    donor_base = _base_matrix(donor)
+    base_delta = _mat_maxdiff(implied_base, donor_base) if donor_base else None
+    matrix_delta = max(deltas) if deltas else None
+    limit = 1.5 / Q13
+    ok = (base_delta is not None and base_delta <= limit
+          and matrix_delta is not None and matrix_delta <= limit)
+    donor_cm2 = getattr(donor, "cm2", None)
+    return {
+        "source": source_kind,
+        "source_cm2": source_cm2,
+        "target_cm2": target_cm2,
+        "sample_cm2": donor_cm2,
+        "cm2_delta": (_mat_maxdiff(donor_cm2, target_cm2)
+                      if donor_cm2 is not None else None),
+        "y": y,
+        "base": implied_base,
+        "donor_base": donor_base,
+        "base_delta": base_delta,
+        "matrix_delta": matrix_delta,
+        "modes": len(deltas),
+        "ok": ok,
+    }
+
+
 def calibration_allows_cross(calibration):
     """True when the calibration proves the transplant is safe."""
     if calibration is None:
@@ -549,6 +641,11 @@ def describe_cm2(cal):
 def describe_calibration(cal):
     """Backwards-compatible wrapper around the reporter."""
     return dng_report.describe_calibration(cal)
+
+
+def describe_baked(baked):
+    """Backwards-compatible wrapper around the reporter."""
+    return dng_report.describe_baked(baked)
 
 
 def check_cross_model(target, donor, allow_cross_model, calibration):
@@ -1184,7 +1281,8 @@ class DonorData:
 
     def __init__(self, model, n_params, rec_size, block_size, block_count,
                  priv_endian, records, matrices, unique_model="",
-                 table_params=None, base_matrix=None, cm2=None):
+                 table_params=None, base_matrix=None, cm2=None,
+                 baked_from=None):
         self.model = model
         self.unique_model = unique_model
         self.n_params = n_params
@@ -1203,6 +1301,10 @@ class DonorData:
         # DNG ColorMatrix2 of the body this bundle was built for, when known.
         # Used only for the base-vs-CM2 sanity check in plan_calibration().
         self.cm2 = _mat_rows(cm2) if cm2 else None
+        # Style table this bundle was derived from (e.g. "kf"), for the
+        # offline-calibration check on bodies with no 0x021B (see
+        # baked_calibration()).
+        self.baked_from = baked_from
         # Bundled tables come from real Pentax data, so their style is known
         # even when they carry no mode-0 record to compare against.
         self.trusted = False
@@ -1253,6 +1355,7 @@ def builtin_donor(kind):
         getattr(data, "TABLE_PARAMS", None),
         getattr(data, "BASE_MATRIX", None),
         getattr(data, "CM2", None),
+        getattr(data, "CALIBRATED_FROM", None),
     )
     donor.trusted = True
     return donor
@@ -1996,6 +2099,9 @@ def patch(args):
         raise DngError("--donor or --builtin is required when records are missing")
 
     calibration = plan_calibration(target, donor) if not args.no_calibrate else None
+    baked = None
+    if calibration is None:
+        baked = baked_calibration(target, donor)
     xform = None
     if calibration is not None and not calibration["identity"]:
         xform = calibration["y"]
@@ -2005,7 +2111,7 @@ def patch(args):
     if mismatch:
         raise DngError(mismatch + " (use --allow-cross-model to override)")
     print("\n".join(dng_report.calibration_report(
-        target, donor, compatible_cross, calibrated_cross, calibration)))
+        target, donor, compatible_cross, calibrated_cross, calibration, baked)))
     print()
 
     plan = plan_patch(target, donor, missing, xform)

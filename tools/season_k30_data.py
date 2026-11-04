@@ -5,12 +5,26 @@ matrices use the same construction as those two bodies: read the body's
 own DNG ColorMatrix2, form T = diag(1/(CM2*W)) * CM2 (D65), solve
 Y = T(KF) * inv(T(K-30)), and write M(K-30 season) = M(KF season) * Y.
 The K-30 ColorMatrix2 comes from sample/K30.DNG (firmware 1.06).
+
+CM2 keeps that calibration input and CALIBRATED_FROM names the style table
+these matrices were derived from, so dng_season_params.baked_calibration()
+can prove at run time that the bundle still equals KF-style * Y for the file
+being patched.
 """
 
 __copyright__ = "Copyright © 2026 KimHoLau X deepseek harness"
 
 from season_common import (BLOCK_SIZE, K30_SERIES_RECORDS, N_PARAMS,
                            REC_SIZE, TABLE_PARAMS)
+
+# DNG ColorMatrix2 (0xC622) of the K-30 sample these seasons were calibrated
+# on.  Only used by the offline-calibration check, never written to a file.
+CM2 = (0.8908843994140625, -0.26922607421875, -0.1193084716796875,
+       -0.3995361328125, 1.2301177978515625, 0.1880645751953125,
+       -0.0991058349609375, 0.1737213134765625, 0.660430908203125)
+
+# Style table the four season matrices were derived from.
+CALIBRATED_FROM = 'kf'
 
 MODEL = 'PENTAX K-30'
 UNIQUE_MODEL = 'PENTAX K-30'
