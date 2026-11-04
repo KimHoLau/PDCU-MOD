@@ -107,11 +107,13 @@ macOS 上要用 py2app 打包（`python3 setup.py py2app`），打包步骤与
   4 个矩阵（量化后 0 LSB）与隐含基准（1.8–5.9×10⁻⁵）：CLI 打印 `recompute : pass …`，
   GUI 日志同步一行“离线校准自检：pass …”。对不上（固件或样本变了）会打印 WARNING，
   并给出矩阵、基准与 ColorMatrix2 三个差值。数据模块新增 `CM2` 与
-  `CALIBRATED_FROM='kf'` 声明；`tests/test_season_data.py` 从 1 台扩到 5 台、6 组用例
+  `CALIBRATED_FROM='kf'` 声明；`tests/test_season_data.py` 从 1 台扩到 5 台、7 组用例
   （含“改 1% ColorMatrix2 必须报警”的防退化用例）。顺带修正 K-50 数据模块里一处过期
   数值（1.4e-5 → 3.65e-5）。PDCU 5.10.2.2 实测：五台的 marker（纯 R/G/B/单位阵）
   全部逐项对应；K-50 的“隐含基准 vs As Shot”跨机身差分 0.27%，Q7 0.67%、MX-1 0.63%。
-  **输出字节未变**（18 组自检与 v2.12 记录逐字节相同）。详见
+  **输出字节未变**（18 组自检与 v2.12 记录逐字节相同）。另：有表机型补做了 marker
+  自检（9 台有样本的机型全部通过）与 donor 风格自洽断言，见
+  [`docs/PDCU-有表机型-marker实测.md`](docs/PDCU-有表机型-marker实测.md)。详见
   [`docs/PDCU-K50-四季方案优化分析.md`](docs/PDCU-K50-四季方案优化分析.md)、
   [`docs/PDCU-K30-K01-四季自检.md`](docs/PDCU-K30-K01-四季自检.md)、
   [`docs/PDCU-Q7-MX1-四季自检.md`](docs/PDCU-Q7-MX1-四季自检.md)。版本号同步到 2.13。

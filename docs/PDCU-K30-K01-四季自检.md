@@ -62,7 +62,7 @@ ColorMatrix2 推出。运行时不重算，所以一旦 KF 表更新、样本换
 另一套凭经验调出来的数；基准差的量级就是 Q13 取整误差。
 
 `tests/test_season_data.py` 从“只测 K-50”扩成**五台**参数化（后续又加了 Q7 / MX-1，
-见 [`PDCU-Q7-MX1-四季自检.md`](PDCU-Q7-MX1-四季自检.md)），六组用例：
+见 [`PDCU-Q7-MX1-四季自检.md`](PDCU-Q7-MX1-四季自检.md)），七组用例：
 
 | 用例 | 覆盖 |
 |---|---|
@@ -137,7 +137,7 @@ K-01 `9ff6192b…`），再次确认改写 `0x021B` 不动默认显影。
 | K-01 输出 SHA-256 | `06B87D743391237AC54EDC847CA8FA97982EDF87BC568F3311E5415B813B3745`（与 README 一致） |
 | K-50 输出 | 仍为 `D45021DE…F75F1A`，未受影响 |
 | K-70 / K-S2 等有 `0x021B` 的机身 | 走原有 `plan_calibration()`，日志与输出不变 |
-| `tests/test_season_data.py` | 六组用例、五台机身全过 |
+| `tests/test_season_data.py` | 七组用例、五台机身全过 |
 
 ## 7. 复现
 

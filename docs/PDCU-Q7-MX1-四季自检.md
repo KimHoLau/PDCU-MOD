@@ -128,7 +128,7 @@ Q7 / MX-1 比 K-50 略大，一部分来自画布几何：Q7 的最佳对齐偏�
 | Q7 输出 SHA-256 | `7113270F5448D828C870F502994A138A57DEE27C4562D796437B69E82395600D`（与 README 一致） |
 | MX-1 输出 SHA-256 | `6CCF0D6238B28CEDF2DB040552A5802A204A4A4BD62BDD3F3188B50C3CE9448F`（与 README 一致） |
 | K-30 / K-01 / K-50 | 未受影响，哈希不变 |
-| `tests/test_season_data.py` | 六组用例、五台机身全过 |
+| `tests/test_season_data.py` | 七组用例、五台机身全过 |
 
 ## 7. 复现
 
