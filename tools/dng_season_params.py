@@ -26,7 +26,7 @@ an approximation.  The style tables are compared first; when they do not look
 like the same table the tool asks for --allow-cross-model (and says so).
 
 PENTAX KF and K-70 share the identical 21 base matrices, so Y is the identity
-there; K-3, K-3 II, K-5 II, K-5 II s and 645Z share the KF style table but
+there; K-3, K-3 II, K-5, K-5 II, K-5 II s, K-r and 645Z share the KF style table but
 differ by Y, which makes a KF donor exact for them too.  The K-1 Mark II
 carries the same 28 mode records and 21 base matrices as the K-1, so the K-1's
 native season table is its exact built-in source (Y = I).  Bodies without any
@@ -68,6 +68,12 @@ the four new matrices cannot fit inside it; the tool rebuilds the whole block
 at the end of the file, exactly as for the K20D.  --builtin k7 carries the
 K-7-calibrated season matrices (its ColorMatrix2 disagrees with 0x021B, like
 the K10D; PDCU reads 0x021B only).
+
+PENTAX K-x (2009) is the same 11-parameter generation, but keeps its tables in
+DNGPrivateData 0xC634: 23 records / 16 matrices, no padding.  Its 0x021B
+matches the K-7 style table (21 common modes within 1.4e-4), so the K-7
+bundle is its exact donor, not KF.  The tool rebuilds 11 -> 12 parameters and
+moves both tables into the block's free area; the MakerNote itself stays put.
 
 Older K-1 firmware (for example v1.50) may reserve a padded 0x021A block and
 leave no gap after 0x021B.  In that case the tool treats the trailing 0x021A
@@ -142,14 +148,17 @@ MODEL_TO_DONOR_KIND = {
     "PENTAX K-70": "kf",
     "PENTAX K-3": "kf",
     "PENTAX K-3 II": "kf",
+    "PENTAX K-5": "kf",
     "PENTAX K-5 II": "kf",
     "PENTAX K-5 II s": "kf",
+    "PENTAX K-r": "kf",
     "PENTAX 645Z": "kf",
     "PENTAX KP": "kf",
     "PENTAX K-S2": "kf",
     "PENTAX 645D": "645d",
     "PENTAX K20D": "k20d",
     "PENTAX K-7": "k7",
+    "PENTAX K-x": "k7",
     "PENTAX K10D": "k10d",
     "PENTAX *ist DL": "istdl",
     "PENTAX K-30": "k30",
@@ -226,11 +235,11 @@ AUTO_SELECT_GROUPS = (
     ("builtin_645d", frozenset(("PENTAX 645D",))),
     ("builtin_k20d", frozenset(("PENTAX K20D",))),
     ("builtin_k10d", frozenset(("PENTAX K10D",))),
-    ("builtin_k7", frozenset(("PENTAX K-7",))),
+    ("builtin_k7", frozenset(("PENTAX K-7", "PENTAX K-x"))),
     ("builtin_istdl", frozenset(("PENTAX *ist DL",))),
-    ("builtin_kf", frozenset(("PENTAX K-3", "PENTAX K-3 II", "PENTAX K-5 II",
-                              "PENTAX K-5 II s", "PENTAX 645Z", "PENTAX KP",
-                              "PENTAX K-S2"))),
+    ("builtin_kf", frozenset(("PENTAX K-3", "PENTAX K-3 II", "PENTAX K-5",
+                              "PENTAX K-5 II", "PENTAX K-5 II s", "PENTAX K-r",
+                              "PENTAX 645Z", "PENTAX KP", "PENTAX K-S2"))),
 )
 
 # Hidden build-test switches.  --selftest-cross is the K-1 donor with the
@@ -356,7 +365,7 @@ def _align_up(value, alignment):
 #
 # which keeps the season style R = M_season * inv(M_base) exactly equal to the
 # donor's while landing in the target's space.  Some bodies (K-3, K-3 II,
-# K-5 II, K-5 II s, 645Z, ...) share the style table and differ only by Y, so
+# K-5, K-5 II, K-5 II s, K-r, 645Z, ...) share the style table and differ only by Y, so
 # this turns a cross-model copy into an exact transplant.
 # ---------------------------------------------------------------------------
 

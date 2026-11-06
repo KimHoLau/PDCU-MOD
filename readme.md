@@ -35,28 +35,33 @@ PDCU 宾得相机DNG文件补齐四季色彩矩阵及曲线参数工具(春红HA
 | 4 | **PENTAX K-1 Mark II** | S | 内置 K-1 原生四季表；28 条记录 / 21 个基础矩阵与 K-1 逐字节相同，Y=I | 7.3×10⁻⁵ | PDCU 菜单 + As Shot 零变化 + 同场景比值（v2.4）；DCU 转出 DNG 实测（v2.11） |
 | 5 | **PENTAX K-3** | A | KF×Y，Y 来自自身 0x021B | 5.7×10⁻⁵ | 九机同场景，CM2 pass |
 | 6 | **PENTAX K-3 II** | A | 同 K-3 的 Y | 5.7×10⁻⁵ | 九机同场景 |
-| 7 | **PENTAX K-5 II** | A | 基准与 K-3 逐字节相同，同一张表 | 6.0×10⁻⁵ | 矩阵/画面 ΔE；未 PDCU 实测 |
-| 8 | **PENTAX K-5 II s** | A | 同 K-5 II | 6.0×10⁻⁵ | 同 K-5 II |
-| 9 | **PENTAX KP** | A | KF×Y(KP) | 6.3×10⁻⁵ | 九机同场景，CM2 pass |
-| 10 | **PENTAX K-S2** | A | KF×Y(K-S2) | 4.3×10⁻⁵ | 九机同场景，CM2 警告 1.3×10⁻² |
-| 11 | **PENTAX 645Z** | A | KF×Y(645Z) | 4.4×10⁻⁵ | 九机同场景，CM2 警告 2.7×10⁻³ |
-| 12 | **PENTAX 645D** | A | KF×Y(645D)，Y 来自自身 0x021B；0x021A 重建为 12 参数 | 5.8×10⁻⁵ | PDCU 菜单 + 四季渲染实测（v2.2），CM2 pass 4.0×10⁻⁵ |
-| 13 | **PENTAX K20D** | A | KF×Y，Y 来自自身 0x021B；0x021A 重建为 12 参数，MakerNote 整块搬到文件尾 | 5.8×10⁻⁵ | PDCU 5.10.2.2 菜单实测（8 参数不列、12 参数列出，v2.8） |
-| 14 | **PENTAX K10D** | A | KF×Y，Y 来自自身 0x021B；0x021A 重建为 12 参数（5 参数表），两张表搬进私有块内空闲区 | 5.6×10⁻⁵ | PDCU 5.10.2.2 菜单 + 四项渲染 + marker + As Shot（v2.9） |
-| 15 | **PENTAX K-7** | A | KF×Y，Y 来自自身 0x021B；0x021A 重建为 12 参数（11 参数表），MakerNote 整块搬到文件尾 | 6.2×10⁻⁵ | PDCU 5.10.2.2 菜单 + 四项渲染 + marker + As Shot（v2.10） |
-| 16 | **PENTAX \*ist DL** | A | KF×Y，Y 来自自身 0x021B；0x021A 重建为 12 参数（5 参数 / 7 条），MakerNote 整块搬到文件尾 | 6.1×10⁻⁵ | PDCU 5.10.2.2 菜单 + 四项渲染 + marker + 全尺寸导出（v2.12） |
-| 17 | **PENTAX K-50** | B | ColorMatrix2 推算 Y | 5.7×10⁻⁵ | 九机同场景 + K-3 渲染对照 |
-| 18 | **PENTAX K-01** | B | ColorMatrix2 推算 Y | 5.5×10⁻⁵ | PDCU 渲染复核（舞狮），无同场景定量 |
-| 19 | **PENTAX K-30** | B | ColorMatrix2 推算 Y | 5.4×10⁻⁵ | PDCU 渲染复核（街景），无同场景定量 |
-| 20 | **PENTAX MX-1** | B | ColorMatrix2 推算 Y（1/1.7"） | 1.07×10⁻⁴ | PDCU 菜单 + 四季渲染 + 同场景比值 + As Shot 零变化（v2.3） |
-| 21 | **PENTAX Q7** | B | ColorMatrix2 推算 Y（小底） | 5.1×10⁻⁵ | 九机同场景，但 Y 不在单反校准线上 |
+| 7 | **PENTAX K-5** | A | KF×Y，Y 来自自身 0x021B；基准与 K-3、K-5 II 逐字节相同 | 5.7×10⁻⁵ | PDCU 5.10.2.2 菜单 + 四季渲染（单场景） |
+| 8 | **PENTAX K-5 II** | A | 基准与 K-3 逐字节相同，同一张表 | 6.0×10⁻⁵ | 矩阵/画面 ΔE；未 PDCU 实测 |
+| 9 | **PENTAX K-5 II s** | A | 同 K-5 II | 6.0×10⁻⁵ | 同 K-5 II |
+| 10 | **PENTAX K-r** | A | KF×Y，Y 来自自身 0x021B；与 K-5 不同 | 6.0×10⁻⁵ | PDCU 5.10.2.2 菜单 + 四季渲染（单场景） |
+| 11 | **PENTAX KP** | A | KF×Y(KP) | 6.3×10⁻⁵ | 九机同场景，CM2 pass |
+| 12 | **PENTAX K-S2** | A | KF×Y(K-S2) | 4.3×10⁻⁵ | 九机同场景，CM2 警告 1.3×10⁻² |
+| 13 | **PENTAX 645Z** | A | KF×Y(645Z) | 4.4×10⁻⁵ | 九机同场景，CM2 警告 2.7×10⁻³ |
+| 14 | **PENTAX 645D** | A | KF×Y(645D)，Y 来自自身 0x021B；0x021A 重建为 12 参数 | 5.8×10⁻⁵ | PDCU 菜单 + 四季渲染实测（v2.2），CM2 pass 4.0×10⁻⁵ |
+| 15 | **PENTAX K20D** | A | KF×Y，Y 来自自身 0x021B；0x021A 重建为 12 参数，MakerNote 整块搬到文件尾 | 5.8×10⁻⁵ | PDCU 5.10.2.2 菜单实测（8 参数不列、12 参数列出，v2.8） |
+| 16 | **PENTAX K10D** | A | KF×Y，Y 来自自身 0x021B；0x021A 重建为 12 参数（5 参数表），两张表搬进私有块内空闲区 | 5.6×10⁻⁵ | PDCU 5.10.2.2 菜单 + 四项渲染 + marker + As Shot（v2.9） |
+| 17 | **PENTAX K-7** | A | KF×Y，Y 来自自身 0x021B；0x021A 重建为 12 参数（11 参数表），MakerNote 整块搬到文件尾 | 6.2×10⁻⁵ | PDCU 5.10.2.2 菜单 + 四项渲染 + marker + As Shot（v2.10） |
+| 18 | **PENTAX K-x** | A | K-7 四季表 × Y(K-x)，Y 来自自身 0x021B；0x021A 11→12 重建，两张表搬进私有块空闲区 | 5.6×10⁻⁵ | PDCU 5.10.2.2 菜单 + 四季渲染（单场景） |
+| 19 | **PENTAX \*ist DL** | A | KF×Y，Y 来自自身 0x021B；0x021A 重建为 12 参数（5 参数 / 7 条），MakerNote 整块搬到文件尾 | 6.1×10⁻⁵ | PDCU 5.10.2.2 菜单 + 四项渲染 + marker + 全尺寸导出（v2.12） |
+| 20 | **PENTAX K-50** | B | ColorMatrix2 推算 Y | 5.7×10⁻⁵ | 九机同场景 + K-3 渲染对照 |
+| 21 | **PENTAX K-01** | B | ColorMatrix2 推算 Y | 5.5×10⁻⁵ | PDCU 渲染复核（舞狮），无同场景定量 |
+| 22 | **PENTAX K-30** | B | ColorMatrix2 推算 Y | 5.4×10⁻⁵ | PDCU 渲染复核（街景），无同场景定量 |
+| 23 | **PENTAX MX-1** | B | ColorMatrix2 推算 Y（1/1.7"） | 1.07×10⁻⁴ | PDCU 菜单 + 四季渲染 + 同场景比值 + As Shot 零变化（v2.3） |
+| 24 | **PENTAX Q7** | B | ColorMatrix2 推算 Y（小底） | 5.1×10⁻⁵ | 九机同场景，但 Y 不在单反校准线上 |
 
-> 表里的 max|ΔR| 是四季风格 R = M季节·inv(M基准) 与 KF 原生的最大差；Q13 一个 LSB
+> 表里的 max|ΔR| 是四季风格 R = M季节·inv(M基准) 与 KF / K-7 原生的最大差；Q13 一个 LSB
 > 是 1.22×10⁻⁴，所以**全部机型都在一个量化步长以内**。
 > S 档：原生或等价原生（4 台）
-> A 档：机身 0x021B 基准精确校准（12 台）
-这 12 台都有 `0x021B` 基准矩阵，工具运行时算 `Y = inv(M_KF[0])·M_body[0]`，
-再把 KF 四季矩阵乘上 Y。数学上就是 Pentax 生成各机身表的做法，所以是“精确解”。
+> A 档：机身 0x021B 基准精确校准（15 台）
+这 15 台都有 `0x021B` 基准矩阵。对与 KF 同表的机身算
+`Y = inv(M_KF[0])·M_body[0]`，再乘 KF 四季矩阵；K-x 与 K-7 同表，算
+`Y = inv(M_K7[0])·M_body[0]`，再乘 K-7 四季矩阵。数学上就是 Pentax 生成
+各机身表的做法，所以是“精确解”。
 > B 档：ColorMatrix2 推算（5 台）
 这 5 台没有 `0x021A`/`0x021B`，Y 只能由 DNG 的 ColorMatrix2 反推：
 
@@ -83,7 +88,7 @@ PDCU 宾得相机DNG文件补齐四季色彩矩阵及曲线参数工具(春红HA
 
 ## 运行
 
-发布文件：`dist/PDCU-Season-Params.exe`（或 `dist/PDCU-Season-ParamsV2.13.zip`）
+发布文件：`dist/PDCU-Season-Params.exe`（或 `dist/PDCU-Season-ParamsV2.14.zip`）
 
 双击运行，首次运行 Windows SmartScreen 可能提示
 “未知发布者”，选择“更多信息 -> 仍要运行”。
@@ -101,6 +106,15 @@ macOS 上要用 py2app 打包（`python3 setup.py py2app`），打包步骤与
 > 发布物命名沿用旧名 `PDCU-Season-Params`（exe / zip / InternalName /
 > OriginalFilename），产品名与文件属性中的 FileDescription / ProductName
 > 仍是 **PDCU MOD**；这是兼容既有发布与脚本的例外，详见「运行」。
+- **v2.14**：新增 **PENTAX K-5、K-r、K-x** 三台支持。
+  K-5 与 K-r 走“KF×Y”的 A 档路径：K-5 的 0x021A 1,068→782 B、0x021B 328→400 B；
+  K-r 的 0x021A 912→782 B、0x021B 328→400 B；两台都有 0x021A 尾部填充，
+  工具用紧凑布局，PDCU 5.10.2.2 实测菜单 + 四季渲染。
+  K-x 则不同：它是 11 参数 / 23 条 / 16 矩阵、无填充，且 0x021B 与 **K-7** 同风格表
+  （21 个共有模式，最大 1.35×10⁻⁴），不是 KF。工具把 K-x 映射到内置 K-7，
+  重建为 12 参数 / 27 条、20 矩阵，并把两张表搬进私有块尾部（文件大小不变），
+  PDCU 5.10.2.2 实测通过。GUI 的“内置 KF / K-70”现在含 K-5 / K-r，
+  “内置 K-7”现在含 K-x；支持机型从 21 台增到 24 台。版本号同步到 2.14。
 - **v2.13**：给五台**没有机内 `0x021B`** 的机身（K-30 / K-01 / K-50 / Q7 / MX-1）
   加**离线校准自检**。这五台的四季矩阵是按各自 ColorMatrix2 离线算好的冻结表；工具
   现在会在转换时用**文件自己的** ColorMatrix2 重算 `Y = T(KF)·inv(T(target))`，核对内置的
@@ -255,6 +269,33 @@ macOS 上要用 py2app 打包（`python3 setup.py py2app`），打包步骤与
   并用 K-30 色彩空间校准 KF 四季矩阵。K-30 自动识别。
 - **v1.5**：内置 KF 四季参数，K-70 自动识别。
 - **v1.4**：内置 KF 数据；KF / K-70 按“基础矩阵相同”精确移植。
+
+### v2.14 打包记录（2026-11-07）
+
+构建：Python 3.14.3 + PyInstaller 6.22.3，PDCU-Season-Params.spec（onefile），
+FileVersion / ProductVersion **2.14.0.0**。
+
+| 产物 | 大小 |
+|---|---:|
+| dist/PDCU-Season-Params.exe | 19,398,784 B |
+| dist/PDCU-Season-ParamsV2.14.zip（exe + 使用说明） | 19,144,746 B |
+
+打包后抽测：
+
+- K-x：exe --selftest-k7 输出与源码工具 .tmp/Kx_k7.dng 逐字节相同
+  （875591EF…2CB03C92）；
+- K-5：exe --selftest-kf 输出与 .tmp/K5_all.dng 相同（67C112F0…）；
+- K-r：exe --selftest-kf 输出与 .tmp/Kr_all.dng 相同（6F533F24…）；
+- 解压 zip 后从解压目录再跑一次 K-x 自检，输出哈希仍相同；
+- 源码测试 python -m pytest：14 passed。
+
+zip 内文件：PDCU-Season-Params.exe + 使用说明.txt（首行 PDCU MOD v2.14，
+正文已补 K-5 / K-r / K-x 与 24 台支持说明）。
+
+SHA-256：
+
+    exe    89D3CBEFE21AE088C35EB26C2A30AFAC2D0D9C813BB8363757BF5FB7A8AA49E0
+    zip    5B4CCEA23C2D53D3C57B35A9B917013AF21EDB40F88C176CDE1E633097FF7629
 
 ### v2.13 打包记录（2026-11-04）
 
