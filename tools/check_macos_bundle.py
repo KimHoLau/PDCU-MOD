@@ -54,7 +54,8 @@ def parse_version(text: str) -> tuple[int, int]:
 
 def evaluate(host_arch: str, host_os: str, bundle_archs: set[str],
              signed: bool, min_os: str | None,
-             rosetta: bool | None = None) -> list[dict]:
+             rosetta: bool | None = None,
+             tcltk_ok: bool = True) -> list[dict]:
     """Return findings; each is {'level': 'block'|'warn'|'note', 'text': str}."""
     findings: list[dict] = []
     archs = set(bundle_archs)
@@ -96,6 +97,12 @@ def evaluate(host_arch: str, host_os: str, bundle_archs: set[str],
                     "未签名会被系统直接终止（Killed: 9）。运行："
                     "codesign --deep --force --sign - \"dist/PDCU MOD.app\""})
 
+    if not tcltk_ok:
+        findings.append({
+            "level": "block",
+            "text": "bundle 缺少 Contents/Resources/lib 下的 Tcl/Tk 脚本库 "
+                    "(init.tcl / tk.tcl)，在未安装 Homebrew Tcl/Tk 的机器上会启动报错"})
+
     if min_os:
         if parse_version(min_os) > parse_version(host_os):
             findings.append({
@@ -104,7 +111,7 @@ def evaluate(host_arch: str, host_os: str, bundle_archs: set[str],
                         % (min_os, host_os)})
 
     if not findings:
-        findings.append({"level": "note", "text": "架构与签名对得上，应该能启动"})
+        findings.append({"level": "note", "text": "架构、签名与 Tcl/Tk 脚本库均完整，能正常启动"})
     return findings
 
 
@@ -157,7 +164,10 @@ def binary_archs(path: Path) -> set[str]:
 
 def is_signed(path: Path) -> bool:
     code, _out = _run(["codesign", "-dv", str(path)])
-    return code == 0
+    if code != 0:
+        return False
+    vcode, _vout = _run(["codesign", "--verify", "--deep", "--strict", str(path)])
+    return vcode == 0
 
 
 def plist_min_os(app: Path) -> str | None:
@@ -178,6 +188,20 @@ def rosetta_installed() -> bool | None:
     if not os.path.exists("/Library/Apple/usr/libexec/oah"):
         return False
     return True
+
+
+def has_tcltk_scripts(app: Path) -> bool:
+    # Alias bundles (`py2app -A`) link against the host Python in place and do
+    # not bundle libtcl/libtk into Contents/Frameworks.
+    frameworks = app / "Contents" / "Frameworks"
+    if not frameworks.is_dir() or not list(frameworks.glob("libtcl*")):
+        return True
+    res_lib = app / "Contents" / "Resources" / "lib"
+    if not res_lib.is_dir():
+        return False
+    has_tcl = any((p / "init.tcl").is_file() for p in res_lib.glob("tcl*"))
+    has_tk = any((p / "tk.tcl").is_file() for p in res_lib.glob("tk*"))
+    return has_tcl and has_tk
 
 
 def main(argv: list[str]) -> int:
@@ -201,6 +225,7 @@ def main(argv: list[str]) -> int:
     min_os = plist_min_os(app)
     binaries = find_binaries(app)
     signed = is_signed(app)
+    tcltk_ok = has_tcltk_scripts(app)
 
     print("app      %s" % app)
     print("host     %s  macOS %s  Rosetta %s"
@@ -208,6 +233,7 @@ def main(argv: list[str]) -> int:
              {True: "已安装", False: "未安装", None: "未知"}[rosetta_installed()]))
     print("min OS   %s" % (min_os or "未声明"))
     print("signed   %s" % ("是" if signed else "否"))
+    print("tcl/tk   %s" % ("是" if tcltk_ok else "否"))
     print()
     print("%-6s %s" % ("archs", "binary"))
     combined: set[str] = set()
@@ -219,7 +245,7 @@ def main(argv: list[str]) -> int:
     print()
 
     findings = evaluate(host_arch, host_os, combined, signed, min_os,
-                        rosetta_installed())
+                        rosetta_installed(), tcltk_ok)
     for item in findings:
         print("[%s] %s" % (item["level"], item["text"]))
 
