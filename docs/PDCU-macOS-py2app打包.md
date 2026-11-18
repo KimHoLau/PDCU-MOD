@@ -178,6 +178,7 @@ python3 tools/check_macos_bundle.py "dist/PDCU MOD.app"
 ```
 host     arm64  macOS 14.5  Rosetta 未安装
 signed   否
+tcl/tk   是
 archs  binary
 x86_64 Contents/MacOS/PDCU MOD
 x86_64 Contents/Frameworks/Python.framework/Versions/3.9/Python
@@ -189,8 +190,9 @@ x86_64 Contents/Frameworks/Python.framework/Versions/3.9/Python
 三条路，按推荐顺序：
 
 1. **在 Apple Silicon 机器上重新打包**（最稳）。装 arm64 版 Python 3.9+ 与
-   Pillow，`python3 setup.py py2app`，产出的就是 arm64；打包后照样跑一次上面的
-   诊断命令确认 `archs` 是 arm64。
+   Pillow，`python3 setup.py py2app`，产出的就是 arm64（`setup.py` 会自动把
+   Homebrew / venv 的 Tcl/Tk 脚本库打进包内，并完成 ad-hoc 签名）；打包后照样跑
+   一次上面的诊断命令确认 `archs` 是 arm64、`signed` 与 `tcl/tk` 均为「是」。
 2. **让 Intel 包在 M 系列上跑**：先
    `softwareupdate --install-rosetta --agree-to-license`，再
    `codesign --deep --force --sign - "dist/PDCU MOD.app"`。能跑，但慢且有后续
@@ -199,11 +201,11 @@ x86_64 Contents/Frameworks/Python.framework/Versions/3.9/Python
    `PDCU_ARCH=universal2 python3 setup.py py2app`，最后仍以诊断命令打印的
    `lipo` 结果为准——任何一环不是 universal2，产出就还是单架构。
 
-签名与分发：
+签名与分发（`setup.py py2app` 默认做 ad-hoc 签名，也可通过 `CODESIGN_IDENTITY` 指定证书）：
 
 ```bash
 codesign --deep --force --sign - "dist/PDCU MOD.app"      # ad-hoc，仅本机/小范围
-codesign --deep --force --sign "Developer ID Application: ..." "dist/PDCU MOD.app"
+CODESIGN_IDENTITY="Developer ID Application: ..." python3 setup.py py2app
 ```
 
 要发给别人还得 `notarytool` 公证，本仓库没有自动化这一步。另外，从网上下载的
